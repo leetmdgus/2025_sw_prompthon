@@ -7,9 +7,10 @@ import { Calendar, MessageCircle, Users, Bell, Settings, UserPlus } from "lucide
 import { CalendarPage } from "./calendar-page"
 import { ClientRegistration } from "./client-registration"
 import { IntegratedCounselingFlow } from "./integrated-counseling-flow"
+import { ClientManagement } from "./client-management"
 
 export function MainDashboard() {
-  const [currentPage, setCurrentPage] = useState<"dashboard" | "calendar" | "registration" | "counseling" | "records">(
+  const [currentPage, setCurrentPage] = useState<"dashboard" | "calendar" | "registration" | "counseling" | "records" | "client-management">(
     "dashboard",
   )
 
@@ -39,6 +40,10 @@ export function MainDashboard() {
 
   if (currentPage === "counseling") {
     return <IntegratedCounselingFlow onBack={() => setCurrentPage("dashboard")} />
+  }
+
+  if (currentPage === "client-management") {
+    return <ClientManagement onBack={() => setCurrentPage("dashboard")} />
   }
 
   if (currentPage === "records") {
@@ -99,7 +104,7 @@ export function MainDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card>
             <CardContent className="p-3 sm:p-4 text-center">
               <Users className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2" />
@@ -121,13 +126,13 @@ export function MainDashboard() {
               <p className="text-xs sm:text-sm text-muted-foreground">이번 주 상담</p>
             </CardContent>
           </Card>
-          <Card>
+          {/* <Card>
             <CardContent className="p-3 sm:p-4 text-center">
               <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-chart-1 mx-auto mb-2" />
               <p className="text-xl sm:text-2xl font-bold text-foreground">85%</p>
               <p className="text-xs sm:text-sm text-muted-foreground">만족도</p>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         {/* Main Menu Buttons */}
@@ -163,7 +168,6 @@ export function MainDashboard() {
               </Button>
             </CardContent>
           </Card>
-
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader className="pb-3 sm:pb-4">
               <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
@@ -187,7 +191,7 @@ export function MainDashboard() {
                   <span className="font-medium text-destructive">5명</span>
                 </div>
               </div>
-              <Button className="w-full mt-3 sm:mt-4 h-10 sm:h-9" onClick={() => setCurrentPage("counseling")}>
+              <Button className="w-full mt-3 sm:mt-4 h-10 sm:h-9" onClick={() => setCurrentPage("client-management")}>
                 AI 가이드 상담 시작
               </Button>
             </CardContent>
@@ -225,7 +229,7 @@ export function MainDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          {/* <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader className="pb-3 sm:pb-4">
               <CardTitle className="flex items-center gap-3 text-base sm:text-lg">
                 <div className="p-2 sm:p-3 bg-accent/10 rounded-lg">
@@ -252,7 +256,7 @@ export function MainDashboard() {
                 기록 조회
               </Button>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         {/* Today's Schedule Preview */}

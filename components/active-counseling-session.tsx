@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo, memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Play, Pause, Square, AlertCircle, Heart, Brain } from "lucide-react"
+import { Clock, Play, Pause, Square, AlertCircle, Heart, Brain, CheckCircle } from "lucide-react"
 import Image from "next/image"
 
 interface ActiveCounselingSessionProps {
@@ -16,7 +16,8 @@ interface ActiveCounselingSessionProps {
   onPause: () => void
 }
 
-export default function ActiveCounselingSession({
+// React.memo로 컴포넌트 최적화 (무한 로딩 방지)
+const ActiveCounselingSession = memo(function ActiveCounselingSession({
   clientName,
   sessionNumber,
   onComplete,
@@ -26,6 +27,7 @@ export default function ActiveCounselingSession({
   const [timeElapsed, setTimeElapsed] = useState(0)
   const [currentPhase, setCurrentPhase] = useState(0)
   const [notes, setNotes] = useState("")
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [emotionalChecks, setEmotionalChecks] = useState({
     depression: 3,
     anxiety: 2,
@@ -40,24 +42,107 @@ export default function ActiveCounselingSession({
     { name: "마무리", duration: 5, color: "bg-purple-500" },
   ]
 
+  // 타이머 useEffect 최적화 (무한 로딩 방지)
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: NodeJS.Timeout | null = null
+    
     if (isRunning) {
       interval = setInterval(() => {
-        setTimeElapsed((prev) => prev + 1)
+        setTimeElapsed(prev => {
+          // 최대 시간 제한으로 무한 증가 방지
+          const maxTime = phases.reduce((sum, phase) => sum + phase.duration, 0) * 60
+          return prev >= maxTime ? maxTime : prev + 1
+        })
       }, 1000)
     }
-    return () => clearInterval(interval)
-  }, [isRunning])
+    
+    // 컴포넌트 언마운트 시 타이머 정리
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+  }, [isRunning, phases])
 
-  const formatTime = (seconds: number) => {
+  // ESC 키로 모달 닫기 (무한 로딩 방지)
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showCompletionModal) {
+        setShowCompletionModal(false)
+      }
+    }
+
+    if (showCompletionModal) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showCompletionModal])
+
+  // 시간 포맷팅 함수 메모이제이션 (무한 로딩 방지)
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+  }, [])
 
-  const totalDuration = phases.reduce((sum, phase) => sum + phase.duration, 0) * 60
-  const progress = (timeElapsed / totalDuration) * 100
+  // 진행률 계산 메모이제이션 (무한 로딩 방지)
+  const { totalDuration, progress } = useMemo(() => {
+    const total = phases.reduce((sum, phase) => sum + phase.duration, 0) * 60
+    const prog = total > 0 ? (timeElapsed / total) * 100 : 0
+    return { totalDuration: total, progress: prog }
+  }, [phases, timeElapsed])
+
+  // 상담 완료 핸들러 메모이제이션 (무한 로딩 방지)
+  const handleCompleteSession = useCallback(() => {
+    setShowCompletionModal(true)
+  }, [])
+
+  const handleConfirmCompletion = useCallback(() => {
+    setShowCompletionModal(false)
+    onComplete()
+  }, [onComplete])
+
+  // 일시정지/재개 핸들러 메모이제이션 (무한 로딩 방지)
+  const handlePlayPause = useCallback(() => {
+    setIsRunning(prev => !prev)
+  }, [])
+
+  // 단계 변경 핸들러 메모이제이션 (무한 로딩 방지)
+  const handleNextPhase = useCallback(() => {
+    setCurrentPhase(prev => Math.min(prev + 1, phases.length - 1))
+  }, [phases.length])
+
+  const handlePrevPhase = useCallback(() => {
+    setCurrentPhase(prev => Math.max(prev - 1, 0))
+  }, [])
+
+  // 감정 체크 핸들러 메모이제이션 (무한 로딩 방지)
+  const handleEmotionalCheck = useCallback((emotion: string, level: number) => {
+    setEmotionalChecks(prev => ({
+      ...prev,
+      [emotion]: level,
+    }))
+  }, [])
+
+  // 메모 변경 핸들러 메모이제이션 (무한 로딩 방지)
+  const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value)
+  }, [])
+
+  // 모달 닫기 핸들러 메모이제이션 (무한 로딩 방지)
+  const handleModalClose = useCallback(() => {
+    setShowCompletionModal(false)
+  }, [])
+
+  // 현재 단계 정보 메모이제이션 (무한 로딩 방지)
+  const currentPhaseInfo = useMemo(() => {
+    return phases[currentPhase] || phases[0]
+  }, [phases, currentPhase])
+
+  // 포맷된 시간 메모이제이션 (무한 로딩 방지)
+  const formattedTime = useMemo(() => formatTime(timeElapsed), [formatTime, timeElapsed])
+  const formattedProgress = useMemo(() => Math.round(progress), [progress])
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -82,14 +167,14 @@ export default function ActiveCounselingSession({
               <h2 className="text-xl font-bold">
                 {clientName} 어르신 상담 ({sessionNumber}회기)
               </h2>
-              <p className="text-gray-600">진행 시간: {formatTime(timeElapsed)}</p>
+              <p className="text-gray-600">진행 시간: {formattedTime}</p>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="w-5 h-5 text-gray-500" />
-              <span className="text-2xl font-mono">{formatTime(timeElapsed)}</span>
+              <span className="text-2xl font-mono">{formattedTime}</span>
             </div>
           </div>
-          <Progress value={progress} className="mt-4" />
+          <Progress value={formattedProgress} className="mt-4" />
         </CardContent>
       </Card>
 
@@ -121,7 +206,7 @@ export default function ActiveCounselingSession({
 
             <div className="mt-6 space-y-2">
               <Button
-                onClick={() => setCurrentPhase(Math.min(currentPhase + 1, phases.length - 1))}
+                onClick={handleNextPhase}
                 className="w-full"
                 disabled={currentPhase === phases.length - 1}
               >
@@ -129,7 +214,7 @@ export default function ActiveCounselingSession({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setCurrentPhase(Math.max(currentPhase - 1, 0))}
+                onClick={handlePrevPhase}
                 className="w-full"
                 disabled={currentPhase === 0}
               >
@@ -145,7 +230,7 @@ export default function ActiveCounselingSession({
             <h3 className="font-bold mb-4">실시간 상담 메모</h3>
             <Textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={handleNotesChange}
               placeholder="상담 중 중요한 내용을 실시간으로 기록하세요..."
               className="min-h-[300px] resize-none"
             />
@@ -223,10 +308,7 @@ export default function ActiveCounselingSession({
                         <button
                           key={num}
                           onClick={() =>
-                            setEmotionalChecks((prev) => ({
-                              ...prev,
-                              [emotion]: num,
-                            }))
+                            handleEmotionalCheck(emotion, num)
                           }
                           className={`w-8 h-8 rounded-full border-2 ${
                             num <= level ? "bg-red-500 border-red-500" : "bg-gray-100 border-gray-300"
@@ -244,15 +326,60 @@ export default function ActiveCounselingSession({
 
       {/* Bottom Controls */}
       <div className="flex justify-center space-x-4 mt-6">
-        <Button variant="outline" onClick={() => setIsRunning(!isRunning)} className="px-8">
+        <Button variant="outline" onClick={handlePlayPause} className="px-8">
           {isRunning ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
           {isRunning ? "일시정지" : "재개"}
         </Button>
-        <Button onClick={onComplete} className="px-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button onClick={handleCompleteSession} className="px-8 bg-emerald-600 hover:bg-emerald-700 text-white">
           <Square className="w-4 h-4 mr-2" />
           상담 완료
         </Button>
       </div>
+
+      {/* Completion Modal */}
+      {showCompletionModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={handleModalClose}
+        >
+          <Card 
+            className="p-8 text-center max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-12 h-12 text-green-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">상담 완료!</h3>
+              <p className="text-gray-600 leading-relaxed">
+                {clientName} 어르신의 {sessionNumber}회기 상담이 성공적으로 완료되었습니다.
+              </p>
+            </div>
+            
+            <div className="space-y-3 mb-6 text-sm text-gray-500">
+              <div className="flex justify-between">
+                <span>상담 시간:</span>
+                <span className="font-medium">{formattedTime}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>진행률:</span>
+                <span className="font-medium">{formattedProgress}%</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-center space-x-3">
+              <Button 
+                onClick={handleConfirmCompletion}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                확인
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
-}
+})
+
+export default ActiveCounselingSession

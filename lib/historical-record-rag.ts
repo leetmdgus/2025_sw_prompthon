@@ -73,26 +73,10 @@ class HistoricalRecordRAGSystem {
   private indexedDimensions: Map<string, MemoryVectorStore> = new Map()
 
   constructor() {
-    this.embeddings = new OpenAIEmbeddings({
-      configuration: {
-        baseOptions: {
-          headers: {
-            "User-Agent": "labchain-counseling-app",
-          },
-        },
-      },
-    })
-
+    this.embeddings = new OpenAIEmbeddings()
     this.llm = new ChatOpenAI({
       modelName: "gpt-4",
       temperature: 0.2,
-      configuration: {
-        baseOptions: {
-          headers: {
-            "User-Agent": "labchain-counseling-app",
-          },
-        },
-      },
     })
   }
 

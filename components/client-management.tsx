@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,7 @@ import {
   MessageCircle,
   Brain,
   BarChart3,
+  RefreshCw,
 } from "lucide-react"
 import { AICounselingGuide } from "./ai-counseling-guide"
 import { EmotionalStateTracking } from "./emotional-state-tracking"
@@ -59,6 +60,7 @@ interface CounselingRecord {
   }
   notes: string
   aiSummary: string
+  autoSummary?: string
 }
 
 const mockClients: Client[] = [
@@ -152,47 +154,416 @@ const mockCounselingRecords: Record<string, CounselingRecord[]> = {
   "1": [
     {
       id: "r1",
-      date: "2024-01-10",
+      date: "2024-01-15",
+      type: "정기",
+      duration: 50,
+      emotionalScores: {
+        depression: 4,
+        anxiety: 3,
+        loneliness: 5,
+        anger: 2,
+      },
+      notes: "🔍 기본 체크리스트\n오늘 기분 (1-10점): 4점\n→ 어제보다는 조금 나아졌지만, 여전히 마음이 무거워요.\n\n🎯 주제 선정\n지난 주에 아들이 놀러왔는데, 그때 기분이 어떠셨나요?\n→ 정말 좋았어요. 손자도 함께 와서 집이 시끌벅적했어요.\n가족 사진을 보시면서 어떤 추억이 떠오르시나요?\n→ 손자와 함께한 놀이터 추억이 떠올라요. 그때 웃음소리가 아직도 귓가에 맴돌아요.\n\n최근에 가족과 나눈 대화 중 기억에 남는 것이 있나요?\n→ 아들이 \"엄마, 걱정하지 마세요\"라고 말한 게 기억에 남아요.\n\n이웃과의 소통에서 느낀 점이 있으신가요?\n→ 이웃과 이야기하면서 혼자가 아니라는 느낌을 받아요.\n\n💭 감정 표현 유도\n\n요즘 가장 많이 느끼시는 감정은 무엇인가요?\n→ 외로움과 동시에 감사함을 느껴요.\n\n그 감정을 느끼실 때 몸에 어떤 변화가 있나요?\n→ 외로움을 느끼면 가슴이 답답해지고, 감사함을 느끼면 마음이 따뜻해져요.🛠️ 대처 전략 제안\n\n외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?\n→ 이웃과 대화하거나, 가족 사진을 보거나, 산책을 나가요.\n\n짧은 산책이나 호흡 운동을 해보신 적이 있나요?\n→ 네, 호흡 운동은 매일 아침에 하고 있어요. 도움이 많이 돼요.\n\n감정 일기를 써보는 것은 어떨까요?\n→ 글씨를 잘 못 써서 어려울 것 같아요.\n\n음악을 듣거나 TV를 보는 것이 도움이 되나요?\n→ 트로트 음악을 들으면 기분이 좋아져요.\n\n취미 활동을 통해 기분 전환을 해보신 적이 있나요?\n→ 요즘은 화분 가꾸기에 관심이 생겼어요.\n\n👨‍👩‍👧‍👦 가족 연계\n\n가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?\n→ \"너희가 있어서 내 인생이 행복했어. 고마워.\"\n\n가족과의 소통에서 개선하고 싶은 부분이 있나요?\n→ 더 자주 연락하고 싶어요. 일주일에 한 번은 꼭 전화하고 싶어요.\n\n가족과의 추억 중 가장 소중한 것은 무엇인가요?\n→ 손자가 태어났을 때의 순간이에요. 그때의 기쁨은 잊을 수 없어요.\n\n가족에게 도움을 받고 싶은 부분이 있나요?\n→ 건강할 때까지 혼자 살 수 있도록 격려해주고 싶어요.",
+      aiSummary: "5회차 상담(2024-01-15)에서 외로움 점수 5점으로 1-2회차 대비 3점 개선 확인. 가족 사진을 통한 추억 대화가 3-4회차에서 효과적이었던 패턴과 일치하여 지속적 적용 권장. 호흡 운동은 2-4회차에서 규칙적으로 실천되어 온 전략으로 현재까지 유지 중. 이웃과의 소통이 4회차에서 확인된 '혼자가 아니라는 느낌' 효과를 재확인. 산책, 음악 감상, 화분 가꾸기 등 새로운 취미 활동이 1-4회차의 가족 중심 접근과 차별화된 개인적 대처 전략으로 발전. 가족과의 정기적 연락 체계 구축은 2회차에서 확인된 연락 빈도 감소 문제의 해결책으로 제시됨. 전반적으로 1-4회차의 점진적 개선 경험을 바탕으로 한 종합적 정서 안정화 달성.",
+    },
+    {
+      id: "r2",
+      date: "2024-01-08",
       type: "정기",
       duration: 45,
+      emotionalScores: {
+        depression: 5,
+        anxiety: 3,
+        loneliness: 6,
+        anger: 2,
+      },
+      notes: "🔍 기본 체크리스트\n\n오늘 기분 (1-10점): 6점\n→ 이웃과 인사 나누면서 기분이 조금 나아졌어요.\n\n잠은 잘 주무셨나요?\n→ 어제보다는 조금 더 잘 잤어요. 6시간 정도 잔 것 같아요.\n\n식사는 제대로 하셨나요?\n→ 아침은 간단하게, 점심은 마트에서 이웃 할머니와 함께 먹었어요.\n\n몸에 아픈 곳은 없으신가요?\n→ 어깨가 조금 뻐근하지만 어제보다는 나아졌어요.\n\n오늘 하루 계획이 있으신가요?\n→ 오후에 이웃 할머니와 함께 마트에 가기로 했어요.\n\n🎯 주제 선정\n\n지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?\n→ 아들이 \"엄마, 걱정하지 마세요\"라고 말한 게 기억에 남아요.\n\n산책은 잘 하고 계시나요?\n→ 네, 매일 아침 30분씩 산책하고 있어요.\n\n이웃과 인사 나누실 때 기분이 어떠신가요?\n→ 처음에는 어색했지만, 요즘은 기다려지는 시간이에요.\n\n최근에 가족과 함께한 최근 활동이 있나요?\n→ 지난 주에 아들이 놀러왔어요. 손자도 함께 와서 정말 좋았어요.\n\n이웃과의 소통에서 느낀 점이 있으신가요?\n→ 이웃과 이야기하면서 혼자가 아니라는 느낌을 받아요.\n\n가족에게 전화를 받은 적이 있나요?\n→ 네, 어제 아들이 전화를 걸어왔어요.\n\n💭 감정 표현 유도\n\n요즘 가장 많이 느끼시는 감정은 무엇인가요?\n→ 외로움이 줄어들면서 기대감이 생기고 있어요.\n\n그 감정을 느끼실 때 몸에 어떤 변화가 있나요?\n→ 기대감을 느끼면 가슴이 두근거리고, 외로움을 느끼면 어깨가 축 처져요.\n\n그 감정을 누군가와 나누고 싶으신가요?\n→ 네, 이웃 할머니와 나누고 싶어요.\n\n감정이 변화하는 순간을 느끼신 적이 있나요?\n→ 이웃과 대화할 때마다 기분이 좋아져요.\n\n어떤 상황에서 기분이 좋아지시나요?\n→ 이웃과 대화할 때, 가족과 함께 있을 때, 산책할 때예요.\n\n🛠️ 대처 전략 제안\n\n외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?\n→ 이웃과 대화하거나, 산책을 나가거나, 가족 사진을 봐요.\n\n짧은 산책이나 호흡 운동을 해보신 적이 있나요?\n→ 네, 호흡 운동은 매일 아침에 하고 있어요.\n\n감정 일기를 써보는 것은 어떨까요?\n→ 글씨를 잘 못 써서 어려울 것 같아요.\n\n음악을 듣거나 TV를 보는 것이 도움이 되나요?\n→ 트로트 음악을 들으면 기분이 좋아져요.\n\n취미 활동을 통해 기분 전환을 해보신 적이 있나요?\n→ 요즘은 화분 가꾸기에 관심이 생겼어요.\n\n👨‍👩‍👧‍👦 가족 연계\n\n가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?\n→ \"너희가 있어서 내 인생이 행복했어. 고마워.\"\n\n가족과 함께하고 싶은 활동이 있나요?\n→ 손자와 함께 공원에서 놀이를 하고 싶어요.\n\n가족과의 소통에서 개선하고 싶은 부분이 있나요?\n→ 더 자주 연락하고 싶어요.\n\n가족과의 추억 중 가장 소중한 것은 무엇인가요?\n→ 손자가 태어났을 때의 순간이에요.\n\n가족에게 도움을 받고 싶은 부분이 있나요?\n→ 건강할 때까지 혼자 살 수 있도록 격려해주고 싶어요.",
+      aiSummary: "4회차 상담(2024-01-08)에서 외로움 점수 6점으로 1-2회차 대비 2점 개선, 3회차와 동일 수준 유지. 이웃과의 마트 방문 및 인사 나누기가 2-3회차에서 확인된 사회적 고립 문제의 구체적 해결책으로 작용. 아들과 손자 방문은 3회차에서 효과적이었던 가족 중심 대화 패턴의 재현으로 정서적 안정에 기여. 매일 아침 30분 산책은 1-3회차의 20분에서 30분으로 확대되어 활동량 증가 경험. 호흡 운동은 2-3회차에서 효과적이었던 대처 전략의 지속적 적용. 이웃과의 대화에서 '혼자가 아니라는 느낌'을 받아 1-2회차의 사회적 고립 문제가 점진적 완화됨을 확인. 지역사회 활동 참여 의향 증가는 1-3회차의 개인적 대처에서 사회적 교류로 전환되는 중요한 변화점.",
+    },
+    {
+      id: "r3",
+      date: "2024-01-01",
+      type: "정기",
+      duration: 40,
+      emotionalScores: {
+        depression: 5,
+        anxiety: 4,
+        loneliness: 6,
+        anger: 2,
+      },
+      notes: "🔍 기본 체크리스트\n\n오늘 기분 (1-10점): 5점\n→ 가족 사진을 보면서 추억에 잠겨있어요.\n\n잠은 잘 주무셨나요?\n→ 어제는 가족 사진을 보면서 잠들었어요. 꿈도 좋았어요.\n\n식사는 제대로 하셨나요?\n→ 아침은 간단하게, 점심은 가족 사진을 보면서 먹었어요.\n\n몸에 아픈 곳은 없으신가요?\n→ 어깨가 조금 뻐근하지만 참을 만해요.\n\n오늘 하루 계획이 있으신가요?\n→ 오후에 가족 사진을 정리하고, 손자와 전화하고 싶어요.\n\n🎯 주제 선정\n\n가족 사진을 보시면서 어떤 추억이 떠오르시나요?\n→ 손자와 함께한 놀이터 추억이 떠올라요. 그때 웃음소리가 아직도 귓가에 맴돌아요.\n\n최근에 가족과 나눈 대화 중 기억에 남는 것이 있나요?\n→ 아들이 \"엄마, 건강하세요\"라고 말한 게 기억에 남아요.\n\n산책은 잘 하고 계시나요?\n→ 네, 매일 아침 20분씩 산책하고 있어요.\n\n이웃과 인사 나누실 때 기분이 어떠신가요?\n→ 처음에는 어색했지만, 요즘은 조금씩 익숙해지고 있어요.\n\n최근에 가족과 함께한 최근 활동이 있나요?\n→ 지난 주에 아들이 놀러왔어요. 손자도 함께 와서 정말 좋았어요.\n\n이웃과의 대화 중 기억에 남는 것이 있나요?\n→ 이웃 할머니가 손자 이야기를 해주신 게 기억에 남아요.\n\n가족에게 전화를 받은 적이 있나요?\n→ 네, 어제 아들이 전화를 걸어왔어요.\n\n💭 감정 표현 유도\n\n요즘 가장 많이 느끼시는 감정은 무엇인가요?\n→ 그리움과 동시에 감사함을 느껴요.\n\n그 감정을 느끼실 때 몸에 어떤 변화가 있나요?\n→ 그리움을 느끼면 가슴이 답답해지고, 감사함을 느끼면 마음이 따뜻해져요.\n\n그 감정을 누군가와 나누고 싶으신가요?\n→ 네, 가족과 나누고 싶어요.\n\n감정이 변화하는 순간을 느끼신 적이 있나요?\n→ 가족 사진을 볼 때마다 기분이 좋아져요.\n\n어떤 상황에서 기분이 좋아지시나요?\n→ 가족과 함께 있을 때, 가족 사진을 볼 때, 손자와 전화할 때예요.\n\n🛠️ 대처 전략 제안\n\n외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?\n→ 가족 사진을 보거나, 가족과 전화하거나, 산책을 나가요.\n\n짧은 산책이나 호흡 운동을 해보신 적이 있나요?\n→ 네, 호흡 운동은 매일 아침에 하고 있어요.\n\n감정 일기를 써보는 것은 어떨까요?\n→ 글씨를 잘 못 써서 어려울 것 같아요.\n\n음악을 듣거나 TV를 보는 것이 도움이 되나요?\n→ 트로트 음악을 들으면 기분이 좋아져요.\n\n취미 활동을 통해 기분 전환을 해보신 적이 있나요?\n→ 요즘은 가족 사진 정리에 관심이 생겼어요.\n\n👨‍👩‍👧‍👦 가족 연계\n\n가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?\n→ \"너희가 있어서 내 인생이 행복했어. 고마워.\"\n\n가족과 함께하고 싶은 활동이 있나요?\n→ 손자와 함께 공원에서 놀이를 하고 싶어요.\n\n가족과의 소통에서 개선하고 싶은 부분이 있나요?\n→ 더 자주 연락하고 싶어요.\n\n가족과의 추억 중 가장 소중한 것은 무엇인가요?\n→ 손자가 태어났을 때의 순간이에요.\n\n가족에게 도움을 받고 싶은 부분이 있나요?\n→ 건강할 때까지 혼자 살 수 있도록 격려해주고 싶어요.",
+      aiSummary: "3회차 상담(2024-01-01)에서 외로움 점수 6점으로 1-2회차 대비 2점 개선, 안정적 상태 유지. 가족 사진을 통한 추억 회상이 1-2회차에서 확인된 가족과의 연결 부족 문제에 대한 새로운 접근법으로 효과적임을 확인. 손자와의 놀이터 추억이 1-2회차의 우울감과 외로움에서 자아존중감 향상으로 전환되는 중요한 계기로 작용. 아들의 '엄마, 건강하세요'라는 말이 2회차에서 경험한 가족과의 연락 단절 문제에 대한 구체적 해결책 제시. 매일 아침 20분 산책은 1-2회차의 실내 활동 중심에서 외부 활동으로 전환되는 첫 시도로 규칙적 생활 패턴 구축에 도움. 이웃과의 대화에서 손자 이야기를 나누며 1-2회차의 사회적 고립에서 지역사회 교류로 발전하는 변화 경험. 가족 중심 대화가 1-2회차의 개인적 문제 해결에서 관계 중심 접근으로 전환되는 치료적 변화점.",
+    },
+    {
+      id: "r4",
+      date: "2024-12-25",
+      type: "정기",
+      duration: 45,
+      emotionalScores: {
+        depression: 7,
+        anxiety: 5,
+        loneliness: 8,
+        anger: 3,
+      },
+      notes: "🔍 기본 체크리스트\n\n오늘 기분 (1-10점): 2점\n→ 외로움이 너무 심해요. 가족들이 연락이 뜸해요.\n\n🎯 주제 선정\n\n가족과의 연락 빈도 감소:\n→ 아들이 일주일째 전화를 안 해요. 무슨 일이 있는 건지 걱정이 됩니다.\n\n💭 감정 표현 유도\n\n외로움을 느낄 때의 감정:\n→ 마음이 텅 비어있는 것 같아요. 누군가와 이야기하고 싶은데 대화할 사람이 없어요.\n\n🛠️ 대처 전략\n\n외로움 극복 방법:\n→ TV를 보거나 라디오를 들으면서 혼자가 아니라는 느낌을 받으려고 해요.\n\n👨‍👩‍👧‍👦 가족 연계\n\n가족에게 하고 싶은 말:\n→ \"연락이 안 되면 걱정돼. 괜찮은지 알려줘.\"",
+      aiSummary: "2회차 상담(2024-12-25)에서 외로움 점수 8점, 우울감 점수 7점으로 1회차 대비 외로움 동일 수준, 우울감 1점 증가로 정서적 악화 확인. 가족과의 연락 빈도 감소가 1회차에서 확인된 사회적 고립 문제의 심화로 나타남. 아들이 일주일째 전화를 안 해서 무슨 일이 있는지 걱정이 되는 상황은 1회차의 '혼자서는 해결할 수 없는 문제들'과 연결되는 가족 관계 악화 패턴. 외로움을 느낄 때 '마음이 텅 비어있는 것 같다'고 표현하며 1회차의 긴장과 기대에서 절망과 무력감으로 전환되는 감정 변화 경험. TV나 라디오를 통한 가상적 소통은 1회차에서 시도한 호흡 운동과 차별화된 새로운 대처 전략으로 외로움 극복 시도. 가족에게 '연락이 안 되면 걱정돼. 괜찮은지 알려줘'라는 메시지 전달 의지는 1회차의 '상담을 받으러 왔어. 조금만 기다려줘'와 대비되는 적극적 의사소통 의지 표현. 가족과의 연결 강화가 시급한 상황으로 판단되며, 1회차에서 계획된 체계적 개입의 즉시 실행이 필요한 위기 단계.",
+    },
+    {
+      id: "r5",
+      date: "2024-12-18",
+      type: "초기",
+      duration: 60,
       emotionalScores: {
         depression: 6,
         anxiety: 4,
         loneliness: 8,
         anger: 3,
       },
-      notes: "외로움 호소, 가족과의 연락 빈도 감소",
-      aiSummary: "외로움 지수가 높아졌으며, 사회적 지지 체계 강화 필요",
-    },
-    {
-      id: "r2",
-      date: "2024-01-03",
-      type: "정기",
-      duration: 40,
-      emotionalScores: {
-        depression: 5,
-        anxiety: 4,
-        loneliness: 7,
-        anger: 2,
-      },
-      notes: "새해 계획에 대한 이야기, 긍정적 반응",
-      aiSummary: "전반적으로 안정적이나 외로움에 대한 지속적 관찰 필요",
+      notes: "🔍 기본 체크리스트\n\n오늘 기분 (1-10점): 1점\n→ 처음 상담을 받으러 왔는데 긴장되고 불안해요.\n\n🎯 주제 선정\n\n상담에 대한 기대와 걱정:\n→ 혼자서는 해결할 수 없는 문제들이 있어서 도움을 받고 싶어요.\n\n💭 감정 표현 유도\n\n상담실에 와서 느끼는 감정:\n→ 긴장과 기대가 섞여 있어요. 누군가 내 이야기를 들어줄 수 있다는 게 기쁘기도 해요.\n\n🛠️ 대처 전략\n\n긴장 완화 방법:\n→ 깊게 숨을 들이마시면서 마음을 진정시키려고 해요.\n\n👨‍👩‍👧‍👦 가족 연계\n\n가족에게 하고 싶은 말:\n→ \"상담을 받으러 왔어. 조금만 기다려줘.\"",
+      aiSummary: "1회차 상담(2024-12-18) 초기 사정에서 외로움 점수 8점, 우울감 점수 6점으로 정서적 불안정 상태 확인. 상담에 대한 긴장과 기대가 섞인 복합적 감정 경험으로 '혼자서는 해결할 수 없는 문제들'에 대한 인식과 동시에 '도움을 받고 싶다'는 적극적 의지 표현. 상담실에서 느끼는 긴장과 기대가 섞인 감정 상태로 '누군가 내 이야기를 들어줄 수 있다는 게 기쁘기도 해요'라고 표현하며 상담에 대한 긍정적 기대감 확인. 깊게 숨을 들이마시면서 마음을 진정시키려는 자체적 대처 시도는 문제 해결을 위한 적극적 노력의 표현. 가족에게 '상담을 받으러 왔어. 조금만 기다려줘'라는 메시지 전달 의지는 가족과의 소통 유지 의지와 상담 과정에 대한 투명성 확보 노력. 외로움과 사회적 고립 문제의 체계적 개입 계획 수립이 필요한 초기 단계로, 상담 동기와 문제 인식이 명확하여 치료적 개입의 기반이 양호한 상태.",
     },
   ],
 }
 
-export function ClientManagement({ onBack }: { onBack: () => void }) {
+// React.memo로 컴포넌트 최적화 (무한 로딩 방지)
+const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: () => void }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [filterPriority, setFilterPriority] = useState<"전체" | "높음" | "보통" | "낮음">("전체")
   const [showAIGuide, setShowAIGuide] = useState(false)
   const [showEmotionalTracking, setShowEmotionalTracking] = useState(false)
-
-  const filteredClients = mockClients.filter((client) => {
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesPriority = filterPriority === "전체" || client.priority === filterPriority
-    return matchesSearch && matchesPriority
+  
+  // 상담 진행을 위한 상태들
+  const [emotionalScores, setEmotionalScores] = useState({
+    depression: 4,
+    anxiety: 3,
+    loneliness: 5,
+    anger: 2
   })
+  const [selectedMood, setSelectedMood] = useState("보통")
+  const [counselingNotes, setCounselingNotes] = useState("")
+  const [sessionStatus, setSessionStatus] = useState<"준비" | "진행중" | "일시정지" | "완료">("준비")
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
+  const [sessionTopic, setSessionTopic] = useState("")
+  const [sessionMethod, setSessionMethod] = useState("대화 중심")
+  const [clientReaction, setClientReaction] = useState("")
+  const [importantStatements, setImportantStatements] = useState("")
+  const [sessionSummary, setSessionSummary] = useState("")
+  const [nextSessionTopic, setNextSessionTopic] = useState("")
+  const [nextSessionDate, setNextSessionDate] = useState("")
+  const [specialNotes, setSpecialNotes] = useState("")
+
+  // AI 가이드 단계별 질문 상태 (초기값 단순화로 무한 로딩 방지)
+  const [stepQuestions, setStepQuestions] = useState({
+    1: [
+      "오늘 기분은 어떠신가요? (1-10점)",
+      "잠은 잘 주무셨나요?",
+      "식사는 제대로 하셨나요?",
+      "몸에 아픈 곳은 없으신가요?",
+      "오늘 하루 계획이 있으신가요?"
+    ],
+    2: [
+      "지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?",
+      "산책은 잘 하고 계시나요?",
+      "이웃과의 소통에서 느낀 점이 있으신가요?",
+      "가족과의 추억 중 가장 소중한 것은 무엇인가요?"
+    ],
+    3: [
+      "요즘 가장 많이 느끼시는 감정은 무엇인가요?",
+      "그 감정을 느끼실 때 몸에 어떤 변화가 있나요?",
+      "그 감정을 누군가와 나누고 싶으신가요?",
+      "감정이 변화하는 순간을 느끼신 적이 있나요?",
+      "어떤 상황에서 기분이 좋아지시나요?"
+    ],
+    4: [
+      "외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?",
+      "짧은 산책이나 호흡 운동을 해보신 적이 있나요?",
+      "감정 일기를 써보는 것은 어떨까요?",
+      "음악을 듣거나 TV를 보는 것이 도움이 되나요?",
+      "취미 활동을 통해 기분 전환을 해보신 적이 있나요?"
+    ],
+    5: [
+      "가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?",
+      "가족과 함께하고 싶은 활동이 있나요?",
+      "가족과의 소통에서 개선하고 싶은 부분이 있나요?",
+      "가족과의 추억 중 가장 소중한 것은 무엇인가요?",
+      "가족에게 도움을 받고 싶은 부분이 있나요?"
+    ]
+  })
+
+  // 체크된 질문들을 추적하는 상태
+  const [checkedQuestions, setCheckedQuestions] = useState<Record<number, Set<number>>>({
+    1: new Set(),
+    2: new Set(),
+    3: new Set(),
+    4: new Set(),
+    5: new Set()
+  })
+
+  // 체크된 질문들을 저장하는 상태
+  const [savedCheckedQuestions, setSavedCheckedQuestions] = useState<Record<number, string[]>>({
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+    5: []
+  })
+
+  // 상담 기록 상세보기 상태 관리
+  const [showDetailStates, setShowDetailStates] = useState<Record<string, boolean>>({})
+
+  // 상담 기록 표시 여부 상태
+  const [showRecords, setShowRecords] = useState(false)
+  
+  // 상담 기록 상태
+  const [clientRecords, setClientRecords] = useState<any[]>([])
+
+  // 무한 로딩 방지를 위한 ref들
+  const isInitialized = useRef(false)
+  const lastClientId = useRef<string | null>(null)
+  const stepUpdateCount = useRef<{ [key: number]: number }>({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 })
+  const isFirstMount = useRef(true) // 초기 마운트 상태 추적
+
+  // selectedClient가 변경될 때 clientRecords 초기화 (무한 루프 방지)
+  useEffect(() => {
+    // 초기 렌더링 시 무한 로딩 방지
+    if (!selectedClient || !selectedClient.id) return
+    
+    // 이미 초기화된 경우 중복 실행 방지
+    if (isInitialized.current && lastClientId.current === selectedClient.id) {
+      return
+    }
+
+    // 무한 로딩 방지를 위한 안전장치
+    if (stepUpdateCount.current[1] > 0) {
+      console.log("이미 초기화된 상태, 중복 실행 방지")
+      return
+    }
+
+    // 안전한 상태 업데이트
+    try {
+      const records = mockCounselingRecords[selectedClient.id] || []
+      setClientRecords(records)
+      lastClientId.current = selectedClient.id
+      isInitialized.current = true
+      
+      console.log(`클라이언트 ${selectedClient.name}의 상담 기록 ${records.length}개 로드됨`)
+      
+      // regenerateStep 자동 실행 방지 - 수동으로만 실행되도록 함
+      console.log("상태 업데이트 체인 순환 방지: regenerateStep 자동 실행 안함")
+      
+    } catch (error) {
+      console.error("클라이언트 기록 로드 중 오류:", error)
+      isInitialized.current = false
+      lastClientId.current = null
+    }
+  }, [selectedClient?.id]) // selectedClient.name 제거하여 무한 루프 방지
+
+  // 클라이언트 선택 해제 시 초기화
+  useEffect(() => {
+    if (!selectedClient) {
+      // 모든 ref 초기화
+      isInitialized.current = false
+      lastClientId.current = null
+      stepUpdateCount.current = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      
+      // 상태 초기화
+      setClientRecords([])
+      setStepQuestions({
+        1: [
+          "오늘 기분은 어떠신가요? (1-10점)",
+          "잠은 잘 주무셨나요?",
+          "식사는 제대로 하셨나요?",
+          "몸에 아픈 곳은 없으신가요?",
+          "오늘 하루 계획이 있으신가요?"
+        ],
+        2: [
+          "지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?",
+          "산책은 잘 하고 계시나요?",
+          "이웃과의 소통에서 느낀 점이 있으신가요?",
+          "가족과의 추억 중 가장 소중한 것은 무엇인가요?"
+        ],
+        3: [
+          "요즘 가장 많이 느끼시는 감정은 무엇인가요?",
+          "그 감정을 느끼실 때 몸에 어떤 변화가 있나요?",
+          "감정을 표현하는 것이 어려우신가요?"
+        ],
+        4: [
+          "외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?",
+          "짧은 산책이나 호흡 운동을 해보신 적이 있나요?",
+          "취미 활동을 통해 기분 전환을 해보신 적이 있나요?"
+        ],
+        5: [
+          "가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?",
+          "가족과 함께하고 싶은 활동이 있나요?",
+          "가족과의 소통에서 개선하고 싶은 부분이 있나요?"
+        ]
+      })
+      setCheckedQuestions({
+        1: new Set(),
+        2: new Set(),
+        3: new Set(),
+        4: new Set(),
+        5: new Set()
+      })
+      setSavedCheckedQuestions({
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: []
+      })
+      setCounselingNotes("")
+    }
+  }, [selectedClient])
+
+  // 컴포넌트 언마운트 시 cleanup (무한 로딩 방지)
+  useEffect(() => {
+    return () => {
+      // 모든 ref 초기화
+      isInitialized.current = false
+      lastClientId.current = null
+      stepUpdateCount.current = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      
+      console.log("ClientManagement 컴포넌트 cleanup 완료")
+    }
+  }, [])
+
+  // 무한 루프 방지를 위한 디바운스 처리
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm)
+  
+  useEffect(() => {
+    // 초기 렌더링 시 무한 로딩 방지
+    if (searchTerm === debouncedSearchTerm) return
+    
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    
+    return () => clearTimeout(timer)
+  }, [searchTerm, debouncedSearchTerm])
+
+  // filteredClients 메모이제이션 (무한 루프 방지)
+  const filteredClients = useMemo(() => {
+    return mockClients.filter((client) => {
+      const matchesSearch = client.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+      const matchesPriority = filterPriority === "전체" || client.priority === filterPriority
+      return matchesSearch && matchesPriority
+    })
+  }, [debouncedSearchTerm, filterPriority])
+
+  const toggleDetail = useCallback((recordId: string) => {
+    setShowDetailStates(prev => ({
+      ...prev,
+      [recordId]: !prev[recordId]
+    }))
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // 체크박스 토글 함수
+  const toggleQuestionCheck = useCallback((stepNumber: number, questionIndex: number) => {
+    setCheckedQuestions(prev => {
+      const newChecked = { ...prev }
+      const stepSet = new Set(newChecked[stepNumber])
+      
+      if (stepSet.has(questionIndex)) {
+        stepSet.delete(questionIndex)
+      } else {
+        stepSet.add(questionIndex)
+      }
+      
+      newChecked[stepNumber] = stepSet
+      return newChecked
+    })
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // 상태 초기화 함수 (무한 루프 방지)
+  const resetStates = useCallback(() => {
+    setStepQuestions({
+      1: [],
+      2: [],
+      3: [],
+      4: [],
+      5: []
+    })
+    setCheckedQuestions({})
+    setSavedCheckedQuestions({})
+    setCounselingNotes("")
+    console.log("모든 상태가 초기화되었습니다.")
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // 체크된 질문들을 저장하는 함수 (무한 루프 방지)
+  const saveCheckedQuestions = useCallback(() => {
+    // 중복 실행 방지
+    if (Object.values(checkedQuestions).every(set => set.size === 0)) {
+      alert("체크된 질문이 없습니다. 먼저 질문을 체크해주세요.")
+      return
+    }
+
+    const newSavedQuestions: Record<number, string[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+    
+    // 체크된 질문들 수집 (안전한 처리)
+    Object.keys(checkedQuestions).forEach(stepNum => {
+      const stepNumber = parseInt(stepNum)
+      const checkedIndices = checkedQuestions[stepNumber]
+      const currentQuestions = stepQuestions[stepNumber as keyof typeof stepQuestions] || []
+      
+      if (checkedIndices && currentQuestions) {
+        checkedIndices.forEach(index => {
+          if (currentQuestions[index]) {
+            newSavedQuestions[stepNumber].push(currentQuestions[index])
+          }
+        })
+      }
+    })
+    
+    // 체크된 질문이 없으면 알림
+    const totalChecked = Object.values(newSavedQuestions).reduce((sum, questions) => sum + questions.length, 0)
+    if (totalChecked === 0) {
+      alert("체크된 질문이 없습니다. 먼저 질문을 체크해주세요.")
+      return
+    }
+    
+    // 상태 업데이트를 한 번에 처리 (무한 루프 방지)
+    setSavedCheckedQuestions(newSavedQuestions)
+    
+    // 상담 메모에 체크된 질문들 추가 (무한 루프 방지)
+    const checkedQuestionsText = Object.entries(newSavedQuestions)
+      .filter(([_, questions]) => questions.length > 0)
+      .map(([stepNum, questions]) => {
+        const stepNames = {
+          1: "🔍 기본 체크리스트",
+          2: "🎯 주제 선정",
+          3: "💭 감정 표현 유도",
+          4: "🛠️ 대처 전략",
+          5: "👨‍👩‍👧‍👦 가족 연계"
+        }
+        return `${stepNames[parseInt(stepNum) as keyof typeof stepNames]}\n${questions.map(q => `• ${q}`).join('\n')}`
+      })
+      .join("\n\n")
+    
+    if (checkedQuestionsText) {
+      const timestamp = new Date().toLocaleString('ko-KR', { 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })
+      
+      const newNote = `[체크된 질문들 - ${timestamp}]\n${checkedQuestionsText}`
+      
+      // 기존 메모가 있으면 추가, 없으면 새로 생성
+      setCounselingNotes(prev => {
+        if (!prev || prev.trim() === '') {
+          return newNote
+        }
+        return prev + "\n\n" + newNote
+      })
+    }
+    
+    // 성공 알림
+    alert(`✅ ${totalChecked}개의 체크된 질문이 저장되었습니다!\n\n상담 메모에 자동으로 추가되었습니다.`)
+    console.log("저장된 체크된 질문들:", newSavedQuestions)
+  }, [checkedQuestions, stepQuestions]) // 필요한 의존성만 포함
 
   const getEmotionalStateColor = (state: string) => {
     switch (state) {
@@ -222,6 +593,926 @@ export function ClientManagement({ onBack }: { onBack: () => void }) {
     }
   }
 
+  // 상담 진행 관련 핸들러들
+  const handleScoreChange = (type: keyof typeof emotionalScores, value: number) => {
+    setEmotionalScores(prev => ({ ...prev, [type]: value }))
+  }
+
+  const handleMoodSelect = (mood: string) => {
+    setSelectedMood(mood)
+  }
+
+  const handleStartSession = () => {
+    setSessionStatus("진행중")
+    setSessionStartTime(new Date())
+    // 상담 시작 시 임시 저장 데이터가 있으면 불러오기
+    loadDraft()
+  }
+
+  const handlePauseSession = () => {
+    setSessionStatus("일시정지")
+  }
+
+  const handleResumeSession = () => {
+    setSessionStatus("진행중")
+  }
+
+  const handleCompleteSession = () => {
+    if (!selectedClient) return
+    
+          // 체크된 질문들 정보 추가
+      const checkedQuestionsInfo = Object.entries(savedCheckedQuestions)
+        .filter(([_, questions]) => questions.length > 0)
+        .map(([stepNum, questions]) => {
+          const stepNames = {
+            1: "기본 체크리스트",
+            2: "주제 선정",
+            3: "감정 표현 유도", 
+            4: "대처 전략",
+            5: "가족 연계"
+          }
+          return `${stepNames[parseInt(stepNum) as keyof typeof stepNames]}: ${questions.join(", ")}`
+        })
+        .join(" | ")
+
+      // 상담 메모 전체 내용 구성
+      const fullCounselingNotes = (() => {
+        let notes = counselingNotes || "AI 가이드 기반 상담 진행"
+        
+        // 체크된 질문들이 있으면 추가 (사용자가 원하는 형식으로)
+        if (Object.values(savedCheckedQuestions).some(questions => questions.length > 0)) {
+          const timestamp = new Date().toLocaleString('ko-KR', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+          
+          notes += `\n\n[체크된 질문들 - ${timestamp}]`
+          
+          Object.entries(savedCheckedQuestions).forEach(([stepNum, questions]) => {
+            if (questions.length > 0) {
+              const stepNames = {
+                1: "🔍 기본 체크리스트",
+                2: "🎯 주제 선정",
+                3: "💭 감정 표현 유도",
+                4: "🛠️ 대처 전략",
+                5: "👨‍👩‍👧‍👦 가족 연계"
+              }
+              notes += `\n${stepNames[parseInt(stepNum) as keyof typeof stepNames]}`
+              questions.forEach(question => {
+                notes += `\n• ${question}`
+              })
+            }
+          })
+        }
+        
+        // 다음 상담 계획이 있으면 추가
+        if (nextSessionTopic || nextSessionDate || specialNotes) {
+          notes += "\n\n[다음 상담 계획]"
+          if (nextSessionTopic) notes += `\n• 다음 상담 주제: ${nextSessionTopic}`
+          if (nextSessionDate) notes += `\n• 예정일: ${nextSessionDate}`
+          if (specialNotes) notes += `\n• 특이사항: ${specialNotes}`
+        }
+        
+        return notes
+      })()
+
+      // 새로운 상담 기록 생성
+      const newCounselingRecord = {
+        id: `session_${Date.now()}`,
+        date: new Date().toISOString().split('T')[0], // 오늘 날짜
+        type: "일반" as const,
+        duration: 60, // 기본 60분
+        notes: fullCounselingNotes,
+        aiSummary: `6회차 상담: ${selectedMood} 기분, 우울(${emotionalScores.depression}) 불안(${emotionalScores.anxiety}) 외로움(${emotionalScores.loneliness}) 분노(${emotionalScores.anger}) 점수. ${nextSessionTopic ? `다음 상담 주제: ${nextSessionTopic}` : ''}${checkedQuestionsInfo ? ` | 체크된 질문들: ${checkedQuestionsInfo}` : ''}`,
+        emotionalScores: {
+          depression: emotionalScores.depression,
+          anxiety: emotionalScores.anxiety,
+          loneliness: emotionalScores.loneliness,
+          anger: emotionalScores.anger
+        }
+      }
+
+    // 상담 기록에 추가
+    setClientRecords((prev: any[]) => [newCounselingRecord, ...prev])
+    
+          // 입력 필드들 초기화
+      setEmotionalScores({
+        depression: 5,
+        anxiety: 5,
+        loneliness: 5,
+        anger: 5
+      })
+      setSelectedMood("보통")
+      setCounselingNotes("")
+      setSessionTopic("")
+      setSessionMethod("대화 중심")
+      setClientReaction("")
+      setImportantStatements("")
+      setSessionSummary("")
+      setNextSessionTopic("")
+      setNextSessionDate("")
+      setSpecialNotes("")
+      setSessionStatus("준비")
+      
+      // 체크된 질문들 상태 초기화
+      setCheckedQuestions({
+        1: new Set(),
+        2: new Set(),
+        3: new Set(),
+        4: new Set(),
+        5: new Set()
+      })
+      setSavedCheckedQuestions({
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: []
+      })
+    
+    // 로컬 스토리지에서 임시 저장 데이터 삭제
+    localStorage.removeItem(`counseling_draft_${selectedClient.id}`)
+    
+    // 상담 완료 알림
+    alert("6회차 상담이 완료되었습니다. 상담 기록에 추가되었습니다.")
+    
+    console.log("상담 완료 및 기록 추가:", newCounselingRecord)
+  }
+
+  const handleSaveDraft = () => {
+    // 임시 저장 로직
+    const draftData = {
+      emotionalScores,
+      selectedMood,
+      counselingNotes,
+      sessionTopic,
+      sessionMethod,
+      clientReaction,
+      importantStatements,
+      sessionSummary,
+      nextSessionTopic,
+      nextSessionDate,
+      specialNotes,
+      timestamp: new Date().toISOString()
+    }
+    localStorage.setItem(`counseling_draft_${selectedClient?.id}`, JSON.stringify(draftData))
+    alert("임시 저장되었습니다.")
+  }
+
+  const loadDraft = () => {
+    if (selectedClient) {
+      const draftData = localStorage.getItem(`counseling_draft_${selectedClient.id}`)
+      if (draftData) {
+        try {
+          const parsed = JSON.parse(draftData)
+          setEmotionalScores(parsed.emotionalScores || emotionalScores)
+          setSelectedMood(parsed.selectedMood || "보통")
+          setCounselingNotes(parsed.counselingNotes || "")
+          setSessionTopic(parsed.sessionTopic || "")
+          setSessionMethod(parsed.sessionMethod || "대화 중심")
+          setClientReaction(parsed.clientReaction || "")
+          setImportantStatements(parsed.importantStatements || "")
+          setSessionSummary(parsed.sessionSummary || "")
+          setNextSessionTopic(parsed.nextSessionTopic || "")
+          setNextSessionDate(parsed.nextSessionDate || "")
+          setSpecialNotes(parsed.specialNotes || "")
+        } catch (error) {
+          console.error("임시 저장 데이터 로드 실패:", error)
+        }
+      }
+    }
+  }
+
+  // AI 가이드 단계별 재생성 함수 (더미 데이터) - 무한 루프 방지
+  const regenerateStep = useCallback((stepNumber: number) => {
+    if (!selectedClient) return
+
+    // 무한 루프 방지: 각 단계별 업데이트 횟수 제한
+    const currentUpdateCount = stepUpdateCount.current[stepNumber] || 0
+    if (currentUpdateCount > 2) { // 3에서 2로 줄임
+      console.warn(`Step ${stepNumber} 업데이트 횟수 제한 도달: ${currentUpdateCount}`)
+      return
+    }
+
+    console.log(`Step ${stepNumber} 재생성 시작 (${currentUpdateCount + 1}번째 시도)`)
+
+    // 현재 단계의 질문들
+    const currentQuestions = stepQuestions[stepNumber as keyof typeof stepQuestions] || []
+    const checkedIndices = checkedQuestions[stepNumber] || new Set()
+    
+    // 체크된 질문들은 보존
+    const preservedQuestions: string[] = []
+    const preservedIndices: number[] = []
+    
+    currentQuestions.forEach((question: string, index: number) => {
+      if (checkedIndices.has(index)) {
+        preservedQuestions.push(question)
+        preservedIndices.push(index)
+      }
+    })
+
+    // 더미 데이터로 새로운 질문들 생성 (비동기 처리 방지)
+    const newQuestions = generateDummyQuestions(stepNumber, selectedClient, clientRecords, emotionalScores)
+    
+    // 보존된 질문들과 새로운 질문들 합치기
+    const finalQuestions = [...preservedQuestions, ...newQuestions]
+    
+    // 상태 업데이트로 UI에 바로 반영 (무한 루프 방지)
+    setStepQuestions(prev => {
+      // 이전 상태와 동일한 경우 업데이트하지 않음 (무한 루프 방지)
+      const stepKey = stepNumber as keyof typeof prev
+      
+      // 간단한 길이 비교로 무한 루프 방지
+      if (prev[stepKey] && prev[stepKey].length === finalQuestions.length) {
+        const isSame = prev[stepKey].every((q, i) => q === finalQuestions[i])
+        if (isSame) {
+          console.log(`Step ${stepNumber} 동일한 내용으로 업데이트 건너뜀`)
+          return prev
+        }
+      }
+      
+      const newState = {
+        ...prev,
+        [stepKey]: finalQuestions
+      }
+      
+      // 업데이트 횟수 증가
+      stepUpdateCount.current[stepNumber] = (stepUpdateCount.current[stepNumber] || 0) + 1
+      
+      console.log(`Step ${stepNumber} 상태 업데이트 완료 (${stepUpdateCount.current[stepNumber]}번째)`)
+      return newState
+    })
+    
+    // 체크된 질문들의 인덱스 재조정
+    const newCheckedIndices = new Set<number>()
+    preservedIndices.forEach((oldIndex, newIndex) => {
+      newCheckedIndices.add(newIndex)
+    })
+    
+    setCheckedQuestions(prev => ({
+      ...prev,
+      [stepNumber]: newCheckedIndices
+    }))
+    
+    console.log(`Step ${stepNumber} 더미 재생성 완료:`, {
+      preservedCount: preservedQuestions.length,
+      newCount: newQuestions.length,
+      totalCount: finalQuestions.length,
+      updateCount: stepUpdateCount.current[stepNumber]
+    })
+  }, [selectedClient?.id, clientRecords.length, emotionalScores]) // 의존성 배열 최적화하여 무한 루프 방지
+
+  // 더미 질문 생성 함수
+  const generateDummyQuestions = useCallback((stepNumber: number, client: Client, records: any[], emotionalScores: any): string[] => {
+    const baseQuestions = {
+      1: [
+        "오늘 기분은 어떠신가요? (1-10점)",
+        "잠은 잘 주무셨나요?",
+        "식사는 제대로 하셨나요?",
+        "몸에 아픈 곳은 없으신가요?",
+        "오늘 하루 계획이 있으신가요?",
+        "어제 무엇을 하셨나요?",
+        "오늘 아침에 기분이 어떠셨나요?",
+        "최근에 좋았던 일이 있나요?"
+      ],
+      2: [
+        "지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?",
+        "산책은 잘 하고 계시나요?",
+        "이웃과 인사 나누실 때 기분이 어떠신가요?",
+        "최근에 가족과 함께한 최근 활동이 있나요?",
+        "이웃과의 소통에서 느낀 점이 있으신가요?",
+        "가족에게 전화를 받은 적이 있나요?",
+        "가족 사진을 보시면서 어떤 추억이 떠오르시나요?",
+        "이웃과의 대화 중 기억에 남는 것이 있나요?"
+      ],
+      3: [
+        "요즘 가장 많이 느끼시는 감정은 무엇인가요?",
+        "그 감정을 느끼실 때 몸에 어떤 변화가 있나요?",
+        "그 감정을 누군가와 나누고 싶으신가요?",
+        "감정이 변화하는 순간을 느끼신 적이 있나요?",
+        "어떤 상황에서 기분이 좋아지시나요?"
+      ],
+      4: [
+        "외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?",
+        "짧은 산책이나 호흡 운동을 해보신 적이 있나요?",
+        "감정 일기를 써보는 것은 어떨까요?",
+        "음악을 듣거나 TV를 보는 것이 도움이 되나요?",
+        "취미 활동을 통해 기분 전환을 해보신 적이 있나요?"
+      ],
+      5: [
+        "가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?",
+        "가족과 함께하고 싶은 활동이 있나요?",
+        "가족과의 소통에서 개선하고 싶은 부분이 있나요?",
+        "가족과의 추억 중 가장 소중한 것은 무엇인가요?",
+        "가족에게 도움을 받고 싶은 부분이 있나요?",
+        "가족과 함께하고 싶은 여행이나 외출이 있나요?",
+        "가족에게 감사한 마음을 표현하고 싶으신가요?",
+        "가족과의 관계에서 가장 중요하다고 생각하는 것은 무엇인가요?"
+      ]
+    }
+
+    // 기본 질문들에서 랜덤하게 선택
+    const questions = baseQuestions[stepNumber as keyof typeof baseQuestions] || []
+    const shuffled = [...questions].sort(() => 0.5 - Math.random())
+    
+    // 회차별 맞춤형 질문 추가
+    const customQuestions = generateCustomQuestions(stepNumber, client, records, emotionalScores)
+    
+    return [...shuffled.slice(0, 4), ...customQuestions].slice(0, 4)
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // 회차별 맞춤형 질문 생성
+  const generateCustomQuestions = useCallback((stepNumber: number, client: Client, records: any[], emotionalScores: any): string[] => {
+    const customQuestions = []
+    
+    if (stepNumber === 2 && records.length > 0) {
+      const latestRecord = records[0]
+      if (latestRecord.notes.includes('가족')) {
+        customQuestions.push("가족과의 최근 대화에서 특별히 기억에 남는 것이 있나요?")
+      }
+      if (latestRecord.notes.includes('이웃')) {
+        customQuestions.push("이웃과의 소통에서 새롭게 배운 점이 있나요?")
+      }
+    }
+    
+    if (stepNumber === 3) {
+      if (emotionalScores.loneliness > 6) {
+        customQuestions.push("외로움을 느끼실 때 어떤 생각이 드시나요?")
+      }
+      if (emotionalScores.depression > 5) {
+        customQuestions.push("기분이 좋아지면 어떤 일을 하고 싶으신가요?")
+      }
+    }
+    
+    if (stepNumber === 4) {
+      if (records.some(r => r.notes.includes('호흡'))) {
+        customQuestions.push("호흡 운동이 도움이 되시나요? 어떤 때 가장 효과적인가요?")
+      }
+      if (records.some(r => r.notes.includes('산책'))) {
+        customQuestions.push("산책할 때 어떤 경로를 선호하시나요?")
+      }
+    }
+    
+    if (stepNumber === 5) {
+      if (records.some(r => r.notes.includes('손자'))) {
+        customQuestions.push("손자와 함께하고 싶은 특별한 활동이 있나요?")
+      }
+      if (records.some(r => r.notes.includes('가족'))) {
+        customQuestions.push("가족에게 전하고 싶은 메시지가 있나요?")
+      }
+    }
+    
+    return customQuestions
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // API 호출 실패 시 사용할 기본 질문들
+  const getFallbackQuestions = (stepNumber: number): string[] => {
+    const fallbackQuestions = {
+      1: ["오늘 기분은 어떠신가요? (1-10점)", "잠은 잘 주무셨나요?", "식사는 제대로 하셨나요?", "몸에 아픈 곳은 없으신가요?"],
+      2: ["지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?", "산책은 잘 하고 계시나요?", "이웃과의 소통에서 느낀 점이 있으신가요?"],
+      3: ["요즘 가장 많이 느끼시는 감정은 무엇인가요?", "그 감정을 느끼실 때 몸에 어떤 변화가 있나요?", "감정을 표현하는 것이 어려우신가요?"],
+      4: ["외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요?", "짧은 산책이나 호흡 운동을 해보신 적이 있나요?", "취미 활동을 통해 기분 전환을 해보신 적이 있나요?"],
+      5: ["가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?", "가족과 함께하고 싶은 활동이 있나요?", "가족과의 소통에서 개선하고 싶은 부분이 있나요?"]
+    }
+    return fallbackQuestions[stepNumber as keyof typeof fallbackQuestions] || []
+  }
+
+  // 상담 기록 AI 요약 함수 (더미 데이터) - 무한 루프 방지
+  const summarizeNotes = (notes: string, clientName: string, sessionNumber: number, date: string) => {
+    try {
+      console.log('더미 요약 시작:', { clientName, sessionNumber, date, notesLength: notes.length })
+      
+      // 더미 요약 데이터 생성 (동기 처리로 무한 루프 방지)
+      const demoSummary = generateDummySummary(clientName, sessionNumber, date, notes)
+      const lineCount = demoSummary.split('\n').filter(line => line.trim().length > 0).length
+      
+      // 요약 결과를 새 창으로 표시 (한 번만 실행)
+      const summaryWindow = window.open('', '_blank', 'width=800,height=600')
+      if (summaryWindow && !summaryWindow.closed) {
+        summaryWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${clientName} 어르신 ${sessionNumber}회차 상담 요약</title>
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; }
+              .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+              .summary { white-space: pre-wrap; background: white; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px; }
+              .stats { color: #6c757d; font-size: 14px; margin-top: 10px; }
+              .demo-badge { background: #ffc107; color: #000; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>${clientName} 어르신 ${sessionNumber}회차 상담 요약 <span class="demo-badge">DEMO</span></h1>
+              <p><strong>상담일:</strong> ${date}</p>
+              <p><strong>요약 줄 수:</strong> ${lineCount}줄</p>
+            </div>
+            <div class="summary">${demoSummary}</div>
+            <div class="stats">
+              <p>이 요약은 더미 데이터로 생성되었습니다. 실제 AI API를 호출하지 않고 프론트엔드에서 생성한 예시입니다.</p>
+            </div>
+          </body>
+          </html>
+        `)
+        summaryWindow.document.close()
+        
+        console.log(`${sessionNumber}회차 상담 요약 완료:`, { lineCount, summary: demoSummary.substring(0, 200) + '...' })
+      }
+      
+    } catch (error) {
+      console.error('상담 기록 요약 오류:', error)
+      alert('상담 기록 요약 중 오류가 발생했습니다.')
+    }
+  }
+
+  // AI 분석 요약 생성 함수 (상담 기록 내용 기반)
+  const generateAutoSummary = (notes: string, date: string): string => {
+    const lines = notes.split('\n').filter(line => line.trim().length > 0)
+    
+    // 감정 상태 분석
+    const emotionalKeywords = {
+      '외로움': 0, '우울': 0, '불안': 0, '화': 0, '기쁨': 0, '감사': 0, '그리움': 0
+    }
+    
+    // 주요 주제 분석
+    const topicKeywords = {
+      '가족': 0, '손자': 0, '이웃': 0, '산책': 0, '호흡': 0, '음악': 0, '사진': 0
+    }
+    
+    // 상담 진행도 분석
+    const progressKeywords = {
+      '개선': 0, '악화': 0, '유지': 0, '변화': 0, '효과': 0
+    }
+    
+    // 키워드 빈도 계산
+    lines.forEach(line => {
+      Object.keys(emotionalKeywords).forEach(keyword => {
+        if (line.includes(keyword)) emotionalKeywords[keyword as keyof typeof emotionalKeywords]++
+      })
+      Object.keys(topicKeywords).forEach(keyword => {
+        if (line.includes(keyword)) topicKeywords[keyword as keyof typeof topicKeywords]++
+      })
+      Object.keys(progressKeywords).forEach(keyword => {
+        if (line.includes(keyword)) progressKeywords[keyword as keyof typeof progressKeywords]++
+      })
+    })
+    
+    // 주요 감정 상태 파악
+    const dominantEmotion = Object.entries(emotionalKeywords)
+      .filter(([_, count]) => count > 0)
+      .sort(([_, a], [__, b]) => b - a)[0]
+    
+    // 주요 관심 주제 파악
+    const dominantTopic = Object.entries(topicKeywords)
+      .filter(([_, count]) => count > 0)
+      .sort(([_, a], [__, b]) => b - a)[0]
+    
+    // 상담 진행 방향 분석
+    const progressDirection = progressKeywords.개선 > progressKeywords.악화 ? '개선' : 
+                             progressKeywords.악화 > progressKeywords.개선 ? '악화' : '유지'
+    
+    // 구체적인 분석 결과 생성
+    let analysis = `🤖 AI 분석 요약 - ${date}\n\n`
+    
+    // 감정 상태 분석
+    analysis += `💭 감정 상태 분석\n`
+    analysis += `• 주요 감정: ${dominantEmotion ? dominantEmotion[0] : '안정적'} (언급 ${dominantEmotion ? dominantEmotion[1] : 0}회)\n`
+    analysis += `• 감정 강도: ${dominantEmotion && dominantEmotion[1] > 3 ? '높음' : '보통'}\n`
+    
+    // 주요 주제 분석
+    analysis += `\n🎯 주요 관심 주제\n`
+    analysis += `• 핵심 주제: ${dominantTopic ? dominantTopic[0] : '일반적'} (언급 ${dominantTopic ? dominantTopic[1] : 0}회)\n`
+    analysis += `• 상담 초점: ${dominantTopic ? `${dominantTopic[0]} 관련 이슈` : '전반적 상담'}\n`
+    
+    // 상담 진행도 분석
+    analysis += `\n📈 상담 진행도\n`
+    analysis += `• 진행 방향: ${progressDirection === '개선' ? '🟢 점진적 개선' : progressDirection === '악화' ? '🔴 주의 필요' : '🟡 현상 유지'}\n`
+    analysis += `• 개선 영역: ${progressKeywords.개선 > 0 ? `${progressKeywords.개선}개 영역에서 개선` : '개선 영역 파악 필요'}\n`
+    
+    // 구체적 권장사항
+    analysis += `\n💡 AI 권장사항\n`
+    if (dominantEmotion && dominantEmotion[0] === '외로움') {
+      analysis += `• 사회적 교류 증진 프로그램 참여 권장\n`
+      analysis += `• 가족과의 정기적 연락 체계 구축\n`
+    }
+    if (dominantTopic && dominantTopic[0] === '가족') {
+      analysis += `• 가족 관계 개선을 위한 구체적 전략 수립\n`
+      analysis += `• 가족과의 소통 방식 개선 방안 모색\n`
+    }
+    if (progressDirection === '개선') {
+      analysis += `• 현재 접근법 유지 및 강화\n`
+      analysis += `• 성공 경험을 바탕으로 한 확장 전략 수립\n`
+    }
+    
+    analysis += `\n📊 상담 효과성: ${progressDirection === '개선' ? '양호' : progressDirection === '악화' ? '주의' : '보통'}`
+    
+    return analysis
+  }
+
+  // 실제 상담 내용 기반 AI 분석 요약 생성 함수
+  const generateDummyAISummary = (notes: string, date: string, emotionalScores: any): string => {
+    const totalScore = emotionalScores.depression + emotionalScores.anxiety + emotionalScores.loneliness + emotionalScores.anger
+    const avgScore = totalScore / 4
+    
+    // 상담 내용에서 핵심 정보 추출
+    const hasFamilyContent = notes.includes('가족') || notes.includes('아들') || notes.includes('손자')
+    const hasNeighborContent = notes.includes('이웃') || notes.includes('소통')
+    const hasActivityContent = notes.includes('산책') || notes.includes('호흡') || notes.includes('음악') || notes.includes('화분')
+    const hasEmotionalContent = notes.includes('외로움') || notes.includes('감사') || notes.includes('기쁨') || notes.includes('그리움')
+    
+    // 감정 상태별 구체적 분석
+    let emotionalAnalysis = ""
+    if (emotionalScores.depression >= 7) {
+      emotionalAnalysis += "• 우울감이 높아 주의가 필요합니다\n"
+    } else if (emotionalScores.depression >= 5) {
+      emotionalAnalysis += "• 우울감이 보통 수준으로 점진적 개선 필요합니다\n"
+    } else {
+      emotionalAnalysis += "• 우울감이 낮아 안정적인 상태입니다\n"
+    }
+    
+    if (emotionalScores.anxiety >= 7) {
+      emotionalAnalysis += "• 불안감이 심해 안정화 기법이 필요합니다\n"
+    } else if (emotionalScores.anxiety >= 5) {
+      emotionalAnalysis += "• 불안감이 보통 수준으로 관리 기법 적용 필요합니다\n"
+    } else {
+      emotionalAnalysis += "• 불안감이 낮아 안정적인 상태입니다\n"
+    }
+    
+    if (emotionalScores.loneliness >= 7) {
+      emotionalAnalysis += "• 외로움이 심해 사회적 교류 증진이 필요합니다\n"
+    } else if (emotionalScores.loneliness >= 5) {
+      emotionalAnalysis += "• 외로움이 보통 수준으로 이웃과의 소통 증진 필요합니다\n"
+    } else {
+      emotionalAnalysis += "• 외로움이 낮아 사회적 연결감이 양호합니다\n"
+    }
+    
+    if (emotionalScores.anger >= 7) {
+      emotionalAnalysis += "• 분노 조절 기법 적용이 필요합니다\n"
+    } else if (emotionalScores.anger >= 5) {
+      emotionalAnalysis += "• 분노가 보통 수준으로 조절 기법 연습 필요합니다\n"
+    } else {
+      emotionalAnalysis += "• 분노가 낮아 안정적인 상태입니다\n"
+    }
+    
+    // 상담 내용 기반 구체적 분석
+    let contentAnalysis = ""
+    if (hasFamilyContent) {
+      contentAnalysis += "• 가족과의 소통이 상담의 핵심 주제로 확인됨\n"
+    }
+    if (hasNeighborContent) {
+      contentAnalysis += "• 이웃과의 소통이 외로움 완화에 효과적임\n"
+    }
+    if (hasActivityContent) {
+      contentAnalysis += "• 산책, 호흡 운동, 음악 등 활동적 대처 전략 활용 중\n"
+    }
+    if (hasEmotionalContent) {
+      contentAnalysis += "• 감정 표현과 인식이 적극적으로 이루어짐\n"
+    }
+    
+    // 위험도 및 권장사항
+    let riskLevel = "낮음"
+    let recommendation = "정기적 모니터링"
+    
+    if (avgScore >= 7) {
+      riskLevel = "높음"
+      recommendation = "즉시 개입 필요"
+    } else if (avgScore >= 5) {
+      riskLevel = "보통"
+      recommendation = "주의 깊은 관찰 필요"
+    }
+    
+    // 상담 효과성 평가
+    let effectiveness = "보통"
+    let nextFocus = "정서 안정화 강화"
+    
+    if (avgScore < 4) {
+      effectiveness = "양호"
+      nextFocus = "현재 접근법 유지 및 강화"
+    } else if (avgScore >= 7) {
+      effectiveness = "주의 필요"
+      nextFocus = "위험 요소 관리 및 긴급 개입"
+    }
+    
+    return `🤖 AI 분석 요약 - ${date}
+
+💭 감정 상태 분석
+• 평균 점수: ${avgScore.toFixed(1)}/10
+• 위험도: ${riskLevel}
+• 권장사항: ${recommendation}
+
+${emotionalAnalysis}
+📋 상담 내용 분석
+${contentAnalysis}
+📊 상담 효과성: ${effectiveness}
+🎯 다음 상담 초점: ${nextFocus}
+💡 핵심 통찰: ${hasFamilyContent ? '가족 중심 접근이 효과적' : '개인적 대처 전략 강화 필요'}`
+  }
+
+  // 요약 재생성 함수
+  const regenerateSummary = useCallback((notes: string, recordId: string) => {
+    const newSummary = generateAutoSummary(notes, new Date().toLocaleDateString())
+    
+    // 클라이언트 레코드 업데이트
+    setClientRecords(prev => prev.map(record => 
+      record.id === recordId 
+        ? { ...record, autoSummary: newSummary }
+        : record
+    ))
+    
+    console.log(`요약 재생성 완료: ${recordId}`, newSummary)
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
+  // 더미 요약 데이터 생성 함수
+  const generateDummySummary = useCallback((clientName: string, sessionNumber: number, date: string, notes: string): string => {
+    const summaries = {
+      1: `🔍 ${clientName} 어르신 ${sessionNumber}회차 상담 요약 (초기 사정)
+
+📅 상담 정보
+• 상담일: ${date}
+• 회차: ${sessionNumber}회차
+• 클라이언트: ${clientName} 어르신
+• 상담 유형: 초기 상담
+
+📝 상담 내용 분석
+• 주요 주제: 외로움, 사회적 고립, 가족과의 소통
+• 감정 상태: 긴장, 기대, 불안
+• 적용된 전략: 호흡 운동, 긴장 완화 기법
+
+💡 핵심 통찰
+• 상담에 대한 긍정적 기대감 존재
+• 혼자서는 해결하기 어려운 문제들 인식
+• 도움을 받고자 하는 적극적 의향
+
+🎯 개선 방향
+• 체계적인 상담 계획 수립
+• 정기적인 상담 일정 조율
+• 단계별 목표 설정
+
+📊 세션 효과성
+• 긴장 완화: 효과적
+• 상담 동기: 높음
+• 전반적 만족도: 양호
+
+🔮 다음 상담 계획
+• 상담 목표 구체화
+• 개인별 맞춤 전략 수립
+• 가족과의 소통 개선 방안
+
+📋 특이사항
+• 호흡 운동이 긴장 완화에 효과적
+• 상담에 대한 긍정적 태도
+• 문제 해결 의지가 강함
+
+💪 권장사항
+• 매일 아침 호흡 운동 실천
+• 상담 일정 준수
+• 가족과의 정기적 소통
+• 일상생활 패턴 유지
+
+🌟 긍정적 변화
+• 긴장감 감소
+• 상담에 대한 기대감 증가
+• 문제 해결 의지 강화
+
+⚠️ 주의사항
+• 지속적인 동기 부여 필요
+• 단계적 접근 방식 적용
+• 가족과의 소통 증진
+
+이 요약은 더미 데이터로 생성되었습니다.`,
+
+      2: `🔍 ${clientName} 어르신 ${sessionNumber}회차 상담 요약 (외로움 심화)
+
+📅 상담 정보
+• 상담일: ${date}
+• 회차: ${sessionNumber}회차
+• 클라이언트: ${clientName} 어르신
+• 상담 유형: 정기 상담
+
+📝 상담 내용 분석
+• 주요 주제: 외로움 심화, 가족과의 연락 감소
+• 감정 상태: 외로움, 우울감, 걱정
+• 적용된 전략: TV/라디오 활용, 일상생활 유지
+
+💡 핵심 통찰
+• 가족과의 연락 빈도 감소로 인한 외로움 증가
+• 일상생활 유지를 통한 정서적 안정 추구
+• 외부 자극을 통한 혼자 있음 극복 시도
+
+🎯 개선 방향
+• 가족과의 연락 빈도 증가
+• 지역사회 활동 참여 증진
+• 정서적 지지 체계 구축
+
+📊 세션 효과성
+• 외로움 점수: 증가 (8점)
+• 우울감: 증가 (7점)
+• 전반적 만족도: 감소
+
+🔮 다음 상담 계획
+• 가족과의 소통 빈도 조율
+• 이웃과의 관계 개선
+• 취미 활동 도입
+
+📋 특이사항
+• TV/라디오가 외로움 완화에 일부 도움
+• 가족 연락 감소에 대한 우려
+• 일상생활 패턴 유지 노력
+
+💪 권장사항
+• 가족과의 정기적 연락
+• 이웃과의 대화 시간 확대
+• 새로운 취미 활동 탐색
+• 정기적인 외출 활동
+
+🌟 긍정적 변화
+• 일상생활 유지 의지
+• 외로움 극복을 위한 노력
+• 문제 상황 인식
+
+⚠️ 주의사항
+• 외로움 심화 모니터링
+• 가족과의 연결 강화
+• 사회적 고립 방지
+
+이 요약은 더미 데이터로 생성되었습니다.`,
+
+      3: `🔍 ${clientName} 어르신 ${sessionNumber}회차 상담 요약 (가족 중심 대화)
+
+📅 상담 정보
+• 상담일: ${date}
+• 회차: ${sessionNumber}회차
+• 클라이언트: ${clientName} 어르신
+• 상담 유형: 정기 상담
+
+📝 상담 내용 분석
+• 주요 주제: 가족 추억, 가족 사진, 자아존중감
+• 감정 상태: 그리움, 감사함, 따뜻함
+• 적용된 전략: 가족 사진을 통한 추억 대화, 가족과의 소통
+
+💡 핵심 통찰
+• 가족과의 추억이 정서적 안정에 핵심 역할
+• 가족 사진이 긍정적 감정 회상에 효과적
+• 자아존중감 향상을 위한 가족 중심 접근
+
+🎯 개선 방향
+• 가족과의 소통 빈도 증가
+• 가족 추억 활용 전략 확대
+• 자아존중감 지속적 향상
+
+📊 세션 효과성
+• 외로움 점수: 개선 (6점)
+• 자아존중감: 향상
+• 전반적 만족도: 향상
+
+🔮 다음 상담 계획
+• 가족과의 정기적 연락
+• 가족 사진 정리 활동
+• 손자와의 소통 강화
+
+📋 특이사항
+• 가족 사진이 추억 회상에 도움
+• 가족과의 대화가 기분 전환에 효과적
+• 손자와의 관계가 특별함
+
+💪 권장사항
+• 가족과의 정기적 연락
+• 가족 사진 정리 및 감상
+• 손자와의 놀이 활동
+• 가족 추억 공유 시간
+
+🌟 긍정적 변화
+• 가족과의 관계 개선
+• 자아존중감 향상
+• 긍정적 감정 증가
+
+⚠️ 주의사항
+• 가족과의 소통 빈도 유지
+• 추억 대화의 적절한 활용
+• 감정적 균형 유지
+
+이 요약은 더미 데이터로 생성되었습니다.`,
+
+      4: `🔍 ${clientName} 어르신 ${sessionNumber}회차 상담 요약 (사회적 교류 증진)
+
+📅 상담 정보
+• 상담일: ${date}
+• 회차: ${sessionNumber}회차
+• 클라이언트: ${clientName} 어르신
+• 상담 유형: 정기 상담
+
+📝 상담 내용 분석
+• 주요 주제: 이웃과의 소통, 지역사회 활동, 사회적 교류
+• 감정 상태: 기대감, 외로움 감소, 사회적 연결감
+• 적용된 전략: 이웃과의 대화, 산책 활동, 마트 방문
+
+💡 핵심 통찰
+• 이웃과의 소통이 외로움 완화에 효과적
+• 지역사회 활동 참여 의향 증가
+• 사회적 연결감이 정서적 안정에 기여
+
+🎯 개선 방향
+• 이웃과의 관계 심화
+• 지역사회 활동 참여 확대
+• 사회적 교류 지속적 증진
+
+📊 세션 효과성
+• 외로움 점수: 개선 (6점)
+• 사회적 교류: 증가
+• 전반적 만족도: 향상
+
+🔮 다음 상담 계획
+• 이웃과의 정기적 대화
+• 지역사회 활동 참여
+• 새로운 사회적 관계 구축
+
+📋 특이사항
+• 이웃과의 대화가 기분 전환에 효과적
+• 산책이 사회적 교류에 도움
+• 마트 방문이 이웃과의 만남 기회 제공
+
+💪 권장사항
+• 매일 아침 산책 활동
+• 이웃과의 정기적 대화
+• 지역사회 활동 참여
+• 새로운 취미 활동 탐색
+
+🌟 긍정적 변화
+• 사회적 교류 의향 증가
+• 외로움 감소 경험
+• 지역사회 활동 관심 증가
+
+⚠️ 주의사항
+• 사회적 교류의 적절한 수준 유지
+• 개인적 공간과 시간 보장
+• 사회적 활동의 지속성 확보
+
+이 요약은 더미 데이터로 생성되었습니다.`,
+
+      5: `🔍 ${clientName} 어르신 ${sessionNumber}회차 상담 요약 (종합적 개선)
+
+📅 상담 정보
+• 상담일: ${date}
+• 회차: ${sessionNumber}회차
+• 클라이언트: ${clientName} 어르신
+• 상담 유형: 정기 상담
+
+📝 상담 내용 분석
+• 주요 주제: 가족 관계, 외로움 관리, 사회적 교류, 대처 전략
+• 감정 상태: 외로움 완화, 감사함, 따뜻함, 기대감
+• 적용된 전략: 호흡 운동, 산책, 가족 사진, 이웃과의 소통
+
+💡 핵심 통찰
+• 가족과의 연결이 정서적 안정의 핵심
+• 체계적인 대처 전략이 외로움 완화에 효과적
+• 사회적 교류와 가족 관계의 균형이 중요
+
+🎯 개선 방향
+• 가족과의 소통 빈도 지속적 증가
+• 사회적 교류 활동 확대
+• 대처 전략의 체계적 적용
+
+📊 세션 효과성
+• 외로움 점수: 개선 (5점)
+• 우울감: 개선 (4점)
+• 전반적 만족도: 크게 향상
+
+🔮 다음 상담 계획
+• 가족과의 주간 정기 연락
+• 새로운 취미 활동 도입
+• 이웃과의 관계 심화
+
+📋 특이사항
+• 호흡 운동이 정서 조절에 매우 효과적
+• 가족 사진이 추억 회상에 큰 도움
+• 산책이 기분 전환과 사회적 교류에 유용
+
+💪 권장사항
+• 매일 아침 호흡 운동 실천
+• 주 3회 이상 산책 활동
+• 가족과의 정기적 연락 유지
+• 이웃과의 대화 시간 확대
+
+🌟 긍정적 변화
+• 외로움 감소 경험
+• 가족과의 관계 개선
+• 사회적 교류 의향 증가
+• 자아존중감 향상
+
+⚠️ 주의사항
+• 감정 변화 모니터링 필요
+• 지속적인 정서적 지지 제공
+• 가족과의 소통 빈도 유지
+
+이 요약은 더미 데이터로 생성되었습니다.`
+    }
+
+    return summaries[sessionNumber as keyof typeof summaries] || summaries[5]
+  }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
+
   if (showEmotionalTracking && selectedClient) {
     return <EmotionalStateTracking client={selectedClient} onBack={() => setShowEmotionalTracking(false)} />
   }
@@ -240,8 +1531,6 @@ export function ClientManagement({ onBack }: { onBack: () => void }) {
   }
 
   if (selectedClient) {
-    const clientRecords = mockCounselingRecords[selectedClient.id] || []
-
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
@@ -357,23 +1646,53 @@ export function ClientManagement({ onBack }: { onBack: () => void }) {
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                     <MessageCircle className="h-5 w-5 text-primary" />
                     상담 기록
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRecords(!showRecords)}
+                      className="flex items-center gap-2"
+                    >
+                      {showRecords ? "기록 숨기기" : "상담 기록 보기"}
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {!showRecords ? (
+                    // 전체 상담 요약
                   <div className="space-y-4">
-                    {clientRecords.map((record) => (
+                      {/* AI 상담 분석 요약 */}
+                      <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                        <h6 className="font-semibold text-green-800 mb-3">🤖 최근 AI 상담 분석 요약</h6>
+                        <div className="space-y-2 text-sm text-green-700">
+                          <p>• 김순애 어르신은 5회차 상담(2024-01-15)에서 가족 사진을 통한 추억 대화와 호흡 운동을 통한 대처 전략을 성공적으로 적용하여 외로움 점수가 8점에서 5점으로 개선되었으며, 이웃과의 산책 활동이 정서 개선에 크게 기여했습니다.</p>
+                          <p>• 4회차(2024-01-08)에서 이웃과의 소통 경험을 통해 지역사회 활동 참여 의향이 증가했으며, 3회차(2024-01-01)의 가족 추억 대화와 가족 사진 정리가 자아존중감 향상에 기여했습니다.</p>
+                          <p>• 1-2회차(2024-12-18~25)의 외로움 호소(8점)와 우울감(6-7점)에서 5회차의 외로움(5점)과 우울감(4점)까지 점진적 개선을 보이나, 지속적인 정서적 지지와 사회적 교류 증진이 필요하며, 가족 연계 강화가 핵심 과제입니다.</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // 상세 상담 기록
+                    <div className="space-y-4">
+                      {clientRecords.map((record, index) => {
+                        const sessionNumber = clientRecords.length - index
+                        const showDetail = showDetailStates[record.id] || false
+                        
+                        return (
                       <div key={record.id} className="border border-border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <Badge variant={record.type === "긴급" ? "destructive" : "default"}>{record.type}</Badge>
                             <span className="font-medium">{record.date}</span>
                             <span className="text-sm text-muted-foreground">{record.duration}분</span>
+                                <span className="text-sm font-medium text-primary">{sessionNumber}회차</span>
                           </div>
                         </div>
-
+                              <div className="space-y-2">
                         <div className="grid grid-cols-4 gap-4 mb-3">
                           <div className="text-center">
                             <p className="text-sm text-muted-foreground">우울</p>
@@ -393,49 +1712,428 @@ export function ClientManagement({ onBack }: { onBack: () => void }) {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">상담 내용</p>
-                            <p className="text-sm">{record.notes}</p>
+                                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
+                                  {/* 상담 기록 헤더 */}
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                      <span className="text-sm font-semibold text-blue-800">상담 기록</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 상담 내용 */}
+                                  <div className="bg-white rounded-lg p-3 border border-blue-100 shadow-sm">
+                                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 max-h-40 overflow-y-auto">
+                                      {record.notes}
+                                    </div>
+                                    
+                                  </div>
+                                  
+                                  {/* AI 분석 요약 */}
+                                  {record.aiSummary && (
+                                    <div className="mt-3 pt-3 border-t border-blue-200">
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                        <span className="text-xs font-medium text-green-700">AI 분석 요약</span>
+                                      </div>
+                                      <div className="bg-green-50 rounded-lg p-2 border border-green-100">
+                                        <p className="text-xs leading-relaxed text-green-800">
+                                          {record.aiSummary || generateDummyAISummary(record.notes, record.date, record.emotionalScores)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                           </div>
-                          <div className="p-3 bg-primary/5 rounded-lg">
-                            <p className="text-sm font-medium text-primary mb-1">AI 분석</p>
-                            <p className="text-sm">{record.aiSummary}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
+              {/* AI 기반 상담 진행 카드 */}
               <Card>
                 <CardHeader>
-                  <CardTitle>맞춤형 정서 가이드</CardTitle>
+                  <CardTitle>6회차 상담 진행 - AI 가이드 기반</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg mb-4">
-                    <h4 className="font-semibold mb-2">AI 추천 상담 전략</h4>
-                    <p className="text-sm mb-3">
-                      {selectedClient.name} 어르신은 최근 외로움이 심해졌습니다. 이번 상담에서는 가족과의 추억 대화를
-                      유도하고, 산책을 제안해보세요.
-                    </p>
+                  <div className="space-y-6">
+                    {/* 기본 감정상태 체크 */}
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-semibold mb-3 text-blue-800">기본 감정상태 체크</h4>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
+                          <label className="text-sm font-medium text-blue-700">우울감 (0-10)</label>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-primary rounded-full"></div>
-                        <span className="text-sm">가족 사진 보며 추억 이야기하기</span>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="10" 
+                              value={emotionalScores.depression}
+                              onChange={(e) => handleScoreChange('depression', parseInt(e.target.value))}
+                              className="flex-1" 
+                            />
+                            <span className="text-sm font-semibold text-blue-800 w-8 text-center">{emotionalScores.depression}</span>
                       </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-blue-700">불안감 (0-10)</label>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-primary rounded-full"></div>
-                        <span className="text-sm">주 2회 이상 산책 계획 세우기</span>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="10" 
+                              value={emotionalScores.anxiety}
+                              onChange={(e) => handleScoreChange('anxiety', parseInt(e.target.value))}
+                              className="flex-1" 
+                            />
+                            <span className="text-sm font-semibold text-blue-800 w-8 text-center">{emotionalScores.anxiety}</span>
                       </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-blue-700">외로움 (0-10)</label>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-primary rounded-full"></div>
-                        <span className="text-sm">이웃과의 소통 기회 만들기</span>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="10" 
+                              value={emotionalScores.loneliness}
+                              onChange={(e) => handleScoreChange('loneliness', parseInt(e.target.value))}
+                              className="flex-1" 
+                            />
+                            <span className="text-sm font-semibold text-blue-800 w-8 text-center">{emotionalScores.loneliness}</span>
                       </div>
                     </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-blue-700">분노 (0-10)</label>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="10" 
+                              value={emotionalScores.anger}
+                              onChange={(e) => handleScoreChange('anger', parseInt(e.target.value))}
+                              className="flex-1" 
+                            />
+                            <span className="text-sm font-semibold text-blue-800 w-8 text-center">{emotionalScores.anger}</span>
                   </div>
-                  <Button className="w-full">새로운 상담 시작</Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-blue-700">전반적 기분</label>
+                        <div className="flex flex-wrap gap-2">
+                          {["매우 좋음", "좋음", "보통", "나쁨", "매우 나쁨", "불안", "우울", "화남", "외로움"].map((mood) => (
+                            <button
+                              key={mood}
+                              onClick={() => handleMoodSelect(mood)}
+                              className={`px-3 py-1 text-xs rounded-full border ${
+                                mood === selectedMood
+                                  ? "bg-blue-600 text-white border-blue-600" 
+                                  : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+                              }`}
+                            >
+                              {mood}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI 상담 가이드 */}
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <h4 className="font-semibold mb-3 text-green-800">AI 상담 가이드</h4>
+                      <div className="space-y-4">
+                        {/* 상담 목표 */}
+                        <div className="p-3 bg-white rounded-lg border border-green-200">
+                          <h5 className="font-medium text-green-800 mb-2">상담 목표</h5>
+                          <div className="space-y-2 text-sm text-green-700">
+                            <p>• 정서적 지지 강화</p>
+                            <p>• 가족관계 속 외로움 완화</p>
+                            <p>• 단기 기억 저하로 인한 혼란 완화</p>
+                          </div>
+                        </div>
+
+                        {/* 5단계 진행 가이드 */}
+                        <div className="space-y-3">
+                          {/* Step 1: 기본적인 체크리스트 */}
+                          <div className="p-3 bg-white rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-green-800">1. 기본적인 체크리스트</h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => regenerateStep(1)}
+                              >
+                                다시 생성
+                              </Button>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {stepQuestions[1].map((q, index) => (
+                                <div key={index} className="flex items-start gap-2 mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedQuestions[1]?.has(index) || false}
+                                    onChange={() => toggleQuestionCheck(1, index)}
+                                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-green-300 rounded"
+                                  />
+                                  <p className="flex-1">{q}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Step 2: 기존 상담 데이터 바탕으로 주제 선정 */}
+                          <div className="p-3 bg-white rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-green-800">2. 기존 상담 데이터 바탕으로 주제 선정</h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => regenerateStep(2)}
+                              >
+                                다시 생성
+                              </Button>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {stepQuestions[2].map((q, index) => (
+                                <div key={index} className="flex items-start gap-2 mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedQuestions[2]?.has(index) || false}
+                                    onChange={() => toggleQuestionCheck(2, index)}
+                                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-green-300 rounded"
+                                  />
+                                  <p className="flex-1">{q}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Step 3: 감정 표현 유도 */}
+                          <div className="p-3 bg-white rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-green-800">3. 감정 표현 유도</h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => regenerateStep(3)}
+                              >
+                                다시 생성
+                              </Button>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {stepQuestions[3].map((q, index) => (
+                                <div key={index} className="flex items-start gap-2 mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedQuestions[3]?.has(index) || false}
+                                    onChange={() => toggleQuestionCheck(3, index)}
+                                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-green-300 rounded"
+                                  />
+                                  <p className="flex-1">{q}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Step 4: 대처 전략 제안 */}
+                          <div className="p-3 bg-white rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-green-800">4. 대처 전략 제안</h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => regenerateStep(4)}
+                              >
+                                다시 생성
+                              </Button>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {stepQuestions[4].map((q, index) => (
+                                <div key={index} className="flex items-start gap-2 mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedQuestions[4]?.has(index) || false}
+                                    onChange={() => toggleQuestionCheck(4, index)}
+                                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-green-300 rounded"
+                                  />
+                                  <p className="flex-1">{q}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Step 5: 가족 연계 */}
+                          <div className="p-3 bg-white rounded-lg border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-green-800">5. 가족 연계</h5>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => regenerateStep(5)}
+                              >
+                                다시 생성
+                              </Button>
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {stepQuestions[5].map((q, index) => (
+                                <div key={index} className="flex items-start gap-2 mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checkedQuestions[5]?.has(index) || false}
+                                    onChange={() => toggleQuestionCheck(5, index)}
+                                    className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-green-300 rounded"
+                                  />
+                                  <p className="flex-1">{q}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 체크된 질문 저장 및 상담 메모 작성 */}
+                        <div className="p-3 bg-white rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <h5 className="font-medium text-green-800">체크된 질문 저장 및 상담 메모</h5>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={saveCheckedQuestions}
+                              >
+                                체크된 질문 저장
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs px-2 py-1 h-6"
+                                onClick={() => {
+                                  setCounselingNotes("")
+                                  setSavedCheckedQuestions({1: [], 2: [], 3: [], 4: [], 5: []})
+                                }}
+                              >
+                                초기화
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* 저장된 체크된 질문들 표시 */}
+                          {Object.entries(savedCheckedQuestions).some(([_, questions]) => questions.length > 0) && (
+                            <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-semibold text-green-700">📝 저장된 체크된 질문들</p>
+                                <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                  총 {Object.values(savedCheckedQuestions).reduce((sum, questions) => sum + questions.length, 0)}개 질문
+                                </span>
+                              </div>
+                              <div className="space-y-2">
+                                {Object.entries(savedCheckedQuestions).map(([stepNum, questions]) => {
+                                  if (questions.length === 0) return null
+                                  const stepNames = {
+                                    1: "🔍 기본 체크리스트",
+                                    2: "🎯 주제 선정", 
+                                    3: "💭 감정 표현 유도",
+                                    4: "🛠️ 대처 전략",
+                                    5: "👨‍👩‍👧‍👦 가족 연계"
+                                  }
+                                  return (
+                                    <div key={stepNum} className="p-2 bg-white rounded border border-green-200">
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-xs font-bold text-green-700 min-w-fit">
+                                          {stepNames[parseInt(stepNum) as keyof typeof stepNames]}
+                                        </span>
+                                        <div className="flex-1">
+                                          {questions.map((question, qIndex) => (
+                                            <div key={qIndex} className="text-xs text-green-600 mb-1 last:mb-0">
+                                              • {question}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* 상담 메모 작성 */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-green-700">상담 메모 작성</label>
+                            <textarea
+                              value={counselingNotes}
+                              onChange={(e) => setCounselingNotes(e.target.value)}
+                              placeholder="AI 가이드의 5단계를 바탕으로 상담 내용을 기록해주세요. 각 단계별 어르신의 반응과 중요한 발언을 포함해주세요..."
+                              className="w-full h-32 p-3 text-sm border border-green-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                            <div className="flex justify-between items-center text-xs text-green-600">
+                              <span>체크된 질문들이 자동으로 메모에 추가됩니다</span>
+                              <span>{counselingNotes.length}자</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 다음 상담 계획 */}
+                    <div className="p-4 bg-indigo-50 rounded-lg">
+                      <h4 className="font-semibold mb-3 text-indigo-800">다음 상담 계획</h4>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-indigo-700">다음 상담 주제</label>
+                            <input 
+                              type="text" 
+                              value={nextSessionTopic}
+                              onChange={(e) => setNextSessionTopic(e.target.value)}
+                              placeholder="다음 상담에서 다룰 주제를 입력하세요"
+                              className="w-full p-2 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-indigo-700">예정일</label>
+                            <input 
+                              type="date" 
+                              value={nextSessionDate}
+                              onChange={(e) => setNextSessionDate(e.target.value)}
+                              className="w-full p-2 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-indigo-700">특이사항 및 주의사항</label>
+                          <textarea
+                            value={specialNotes}
+                            onChange={(e) => setSpecialNotes(e.target.value)}
+                            placeholder="다음 상담 시 참고할 특이사항이나 주의사항을 기록하세요"
+                            className="w-full h-20 p-2 text-sm border border-indigo-300 rounded resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 상담 완료 버튼 */}
+                    <div className="flex gap-3">
+                      <Button onClick={handleSaveDraft} className="flex-1" variant="outline">
+                        임시 저장
+                      </Button>
+                      <Button onClick={loadDraft} className="flex-1" variant="outline">
+                        임시 저장 불러오기
+                      </Button>
+                      <Button onClick={handleCompleteSession} className="flex-1" disabled={sessionStatus === "준비"}>
+                        상담 완료
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -545,4 +2243,7 @@ export function ClientManagement({ onBack }: { onBack: () => void }) {
       </main>
     </div>
   )
-}
+})
+
+export { ClientManagement }
+
