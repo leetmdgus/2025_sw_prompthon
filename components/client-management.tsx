@@ -400,7 +400,7 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
           "지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?",
           "산책은 잘 하고 계시나요?",
           "이웃과 인사 나누실 때 기분이 어떠신가요?",
-                  "이웃과의 대화 중 기억에 남는 것이 있나요?"
+          "이웃과의 대화 중 기억에 남는 것이 있나요?"
         ],
             3: [
         "요즘 가장 많이 느끼시는 감정은 무엇인가요? (1-5회차에서 확인된 외로움, 우울감, 감사함 등 감정 변화 추이)",
@@ -808,24 +808,14 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
     }
   }
 
-  // AI 가이드 단계별 재생성 함수 (더미 데이터) - 무한 루프 방지
+  // AI 가이드 단계별 재생성 함수 (더미 데이터) - 체크된 질문 보존 및 무한 루프 방지
   const regenerateStep = useCallback((stepNumber: number) => {
     if (!selectedClient) return
-
-    // 무한 루프 방지: 각 단계별 업데이트 횟수 제한
-    const currentUpdateCount = stepUpdateCount.current[stepNumber] || 0
-    if (currentUpdateCount > 2) { // 3에서 2로 줄임
-      console.warn(`Step ${stepNumber} 업데이트 횟수 제한 도달: ${currentUpdateCount}`)
-      return
-    }
-
-    console.log(`Step ${stepNumber} 재생성 시작 (${currentUpdateCount + 1}번째 시도)`)
-
-    // 현재 단계의 질문들
+    // 현재 단계의 질문들과 체크 상태
     const currentQuestions = stepQuestions[stepNumber as keyof typeof stepQuestions] || []
     const checkedIndices = checkedQuestions[stepNumber] || new Set()
     
-    // 체크된 질문들은 보존
+    // 체크된 질문들은 절대 변경하지 않음 - 완벽하게 보존
     const preservedQuestions: string[] = []
     const preservedIndices: number[] = []
     
@@ -833,21 +823,43 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
       if (checkedIndices.has(index)) {
         preservedQuestions.push(question)
         preservedIndices.push(index)
+        console.log(`체크된 질문 보존: "${question}"`)
       }
     })
 
-    // 더미 데이터로 새로운 질문들 생성 (비동기 처리 방지)
+    // 체크되지 않은 질문들만 새로운 질문으로 교체
+    const uncheckedCount = currentQuestions.length - preservedQuestions.length
+    
+    // 체크되지 않은 질문이 없으면 재생성하지 않음
+    if (uncheckedCount === 0) {
+      console.log(`Step ${stepNumber}: 모든 질문이 체크되어 있어 재생성이 필요하지 않습니다.`)
+      return
+    }
+    
+    // 새로운 질문들을 생성 (체크되지 않은 질문 수만큼)
     const newQuestions = generateDummyQuestions(stepNumber, selectedClient, clientRecords, emotionalScores)
     
-    // 보존된 질문들과 새로운 질문들 합치기
-    const finalQuestions = [...preservedQuestions, ...newQuestions]
+    // 체크되지 않은 질문 수만큼 새로운 질문 선택
+    const questionsToAdd = newQuestions.slice(0, uncheckedCount)
     
-    // 상태 업데이트로 UI에 바로 반영 (무한 루프 방지)
+    // 최종 질문 배열: 체크된 질문들 + 새로운 질문들
+    const finalQuestions = [...preservedQuestions, ...questionsToAdd]
+    
+    console.log(`질문 재생성 계획:`, {
+      step: stepNumber,
+      체크된질문수: preservedQuestions.length,
+      체크되지않은질문수: uncheckedCount,
+      새로추가할질문수: questionsToAdd.length,
+      최종질문수: finalQuestions.length,
+      보존되는질문들: preservedQuestions,
+      새로추가되는질문들: questionsToAdd
+    })
+    
+    // 상태 업데이트로 UI에 바로 반영
     setStepQuestions(prev => {
-      // 이전 상태와 동일한 경우 업데이트하지 않음 (무한 루프 방지)
       const stepKey = stepNumber as keyof typeof prev
       
-      // 간단한 길이 비교로 무한 루프 방지
+      // 이전 상태와 동일한 경우 업데이트하지 않음
       if (prev[stepKey] && prev[stepKey].length === finalQuestions.length) {
         const isSame = prev[stepKey].every((q, i) => q === finalQuestions[i])
         if (isSame) {
@@ -868,26 +880,29 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
       return newState
     })
     
-    // 체크된 질문들의 인덱스 재조정
+    // 체크된 질문들의 인덱스는 그대로 유지 (0부터 시작)
     const newCheckedIndices = new Set<number>()
-    preservedIndices.forEach((oldIndex, newIndex) => {
-      newCheckedIndices.add(newIndex)
-    })
+    for (let i = 0; i < preservedQuestions.length; i++) {
+      newCheckedIndices.add(i)
+    }
     
     setCheckedQuestions(prev => ({
       ...prev,
       [stepNumber]: newCheckedIndices
     }))
     
-    console.log(`Step ${stepNumber} 더미 재생성 완료:`, {
-      preservedCount: preservedQuestions.length,
-      newCount: newQuestions.length,
-      totalCount: finalQuestions.length,
-      updateCount: stepUpdateCount.current[stepNumber]
+    console.log(`Step ${stepNumber} 재생성 완료:`, {
+      체크된질문보존: preservedQuestions.length,
+      새로추가된질문: questionsToAdd.length,
+      최종질문수: finalQuestions.length,
+      체크된인덱스: Array.from(newCheckedIndices),
+      업데이트횟수: stepUpdateCount.current[stepNumber],
+      보존된질문들: preservedQuestions,
+      새로추가된질문들: questionsToAdd
     })
-  }, [selectedClient?.id, clientRecords.length, emotionalScores]) // 의존성 배열 최적화하여 무한 루프 방지
+  }, [selectedClient?.id, clientRecords.length, emotionalScores, stepQuestions, checkedQuestions]) // 필요한 의존성만 포함
 
-  // 더미 질문 생성 함수
+    // 더미 질문 생성 함수 - 체크된 질문과 중복되지 않는 새로운 질문 생성
   const generateDummyQuestions = useCallback((stepNumber: number, client: Client, records: any[], emotionalScores: any): string[] => {
     const baseQuestions = {
       1: [
@@ -898,7 +913,11 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
         "오늘 하루 계획이 있으신가요?",
         "어제 무엇을 하셨나요?",
         "오늘 아침에 기분이 어떠셨나요?",
-        "최근에 좋았던 일이 있나요?"
+        "최근에 좋았던 일이 있나요?",
+        "오늘 날씨는 어떠신가요?",
+        "아침 식사는 맛있게 드셨나요?",
+        "오늘은 특별히 기대되는 일이 있나요?",
+        "어제 밤에 꿈을 꾸셨나요?"
       ],
       2: [
         "지난 주에 가족과 나눈 대화 중 기억에 남는 것이 있나요?",
@@ -908,32 +927,40 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
         "이웃과의 소통에서 느낀 점이 있으신가요?",
         "가족에게 전화를 받은 적이 있나요?",
         "가족 사진을 보시면서 어떤 추억이 떠오르시나요?",
-        "이웃과의 대화 중 기억에 남는 것이 있나요?"
+        "이웃과의 대화 중 기억에 남는 것이 있나요?",
+        "가족과 함께 TV를 보시는 시간이 있나요?",
+        "이웃과 함께 마트에 가시는 일이 있나요?",
+        "가족과 함께 식사하는 시간이 있나요?",
+        "이웃과 함께 산책하는 것이 어떠신가요?"
       ],
-          3: [
-      "요즘 가장 많이 느끼시는 감정은 무엇인가요? (1-5회차에서 확인된 외로움, 우울감, 감사함 등 감정 변화 추이)",
-      "그 감정을 느끼실 때 몸에 어떤 변화가 있나요? (2-5회차에서 경험한 '가슴이 답답해지고', '마음이 따뜻해지는' 신체 반응)",
-      "그 감정을 누군가와 나누고 싶으신가요? (3-5회차에서 효과적이었던 가족, 이웃과의 감정 공유)",
-      "감정이 변화하는 순간을 느끼신 적이 있나요? (4-5회차에서 확인된 '이웃과 대화할 때마다 기분이 좋아지는' 경험)",
-      "어떤 상황에서 기분이 좋아지시나요? (1-5회차에서 효과적이었던 가족과의 시간, 산책, 음악 감상 등)",
-      "외로움을 느낄 때와 감사함을 느낄 때의 차이점은 무엇인가요? (5회차에서 경험한 복합적 감정 상태 분석)",
-      "가족 사진을 볼 때와 이웃과 대화할 때의 감정 변화는 어떠신가요? (3-5회차에서 확인된 정서적 안정 효과)",
-      "손자와 함께 있을 때의 감정 상태는 어떠신가요? (3-5회차에서 자아존중감 향상에 기여한 감정 경험)",
-      "호흡 운동을 할 때의 감정 변화는 어떠신가요? (2-5회차에서 효과적이었던 대처 전략의 감정적 효과)",
-      "이웃과 마트에 갈 때의 기대감은 어떠신가요? (4회차에서 사회적 교류 증진에 도움이 되었던 긍정적 감정)"
-    ],
-          4: [
-      "외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요? (1-5회차에서 효과적이었던 이웃과의 대화, 가족 사진 보기, 산책 등)",
-      "짧은 산책이나 호흡 운동을 해보신 적이 있나요? (2-5회차에서 규칙적으로 실천되어 온 대처 전략의 지속적 효과)",
-      "감정 일기를 써보는 것은 어떨까요? (1회차에서 '글씨를 잘 못 써서 어려울 것 같아요'라고 표현했던 대안적 방법 모색)",
-      "음악을 듣거나 TV를 보는 것이 도움이 되나요? (2-5회차에서 트로트 음악이 기분 전환에 효과적이었던 경험)",
-      "취미 활동을 통해 기분 전환을 해보신 적이 있나요? (3-5회차에서 가족 사진 정리, 화분 가꾸기 등 새로운 취미 개발)",
-      "이웃과 함께 마트에 가는 것이 어떠신가요? (4회차에서 사회적 교류 증진에 효과적이었던 지역사회 활동)",
-      "가족과의 정기적 연락 체계를 구축하는 것은 어떨까요? (2회차에서 확인된 연락 빈도 감소 문제의 구체적 해결책)",
-      "손자와 함께 공원에서 놀이를 하는 것은 어떠신가요? (3-4회차에서 자아존중감 향상에 기여했던 가족 활동)",
-      "매일 아침 산책 시간을 30분에서 40분으로 늘려보는 것은 어떨까요? (4-5회차에서 20분→30분으로 확대된 활동량 증가 경험)",
-      "이웃과의 대화에서 손자 이야기를 나누는 것이 어떠신가요? (3-4회차에서 사회적 교류 증진에 도움이 되었던 주제)"
-    ],
+      3: [
+        "요즘 가장 많이 느끼시는 감정은 무엇인가요? (1-5회차에서 확인된 외로움, 우울감, 감사함 등 감정 변화 추이)",
+        "그 감정을 느끼실 때 몸에 어떤 변화가 있나요? (2-5회차에서 경험한 '가슴이 답답해지고', '마음이 따뜻해지는' 신체 반응)",
+        "그 감정을 누군가와 나누고 싶으신가요? (3-5회차에서 효과적이었던 가족, 이웃과의 감정 공유)",
+        "감정이 변화하는 순간을 느끼신 적이 있나요? (4-5회차에서 확인된 '이웃과 대화할 때마다 기분이 좋아지는' 경험)",
+        "어떤 상황에서 기분이 좋아지시나요? (1-5회차에서 효과적이었던 가족과의 시간, 산책, 음악 감상 등)",
+        "외로움을 느낄 때와 감사함을 느낄 때의 차이점은 무엇인가요? (5회차에서 경험한 복합적 감정 상태 분석)",
+        "가족 사진을 볼 때와 이웃과 대화할 때의 감정 변화는 어떠신가요? (3-5회차에서 확인된 정서적 안정 효과)",
+        "손자와 함께 있을 때의 감정 상태는 어떠신가요? (3-5회차에서 자아존중감 향상에 기여한 감정 경험)",
+        "호흡 운동을 할 때의 감정 변화는 어떠신가요? (2-5회차에서 효과적이었던 대처 전략의 감정적 효과)",
+        "이웃과 마트에 갈 때의 기대감은 어떠신가요? (4회차에서 사회적 교류 증진에 도움이 되었던 긍정적 감정)",
+        "음악을 들을 때의 감정 변화는 어떠신가요?",
+        "TV를 볼 때의 감정 상태는 어떠신가요?"
+      ],
+      4: [
+        "외로움을 느끼실 때 어떤 일을 하시면 기분이 좋아지나요? (1-5회차에서 효과적이었던 이웃과의 대화, 가족 사진 보기, 산책 등)",
+        "짧은 산책이나 호흡 운동을 해보신 적이 있나요? (2-5회차에서 규칙적으로 실천되어 온 대처 전략의 지속적 효과)",
+        "감정 일기를 써보는 것은 어떨까요? (1회차에서 '글씨를 잘 못 써서 어려울 것 같아요'라고 표현했던 대안적 방법 모색)",
+        "음악을 듣거나 TV를 보는 것이 도움이 되나요? (2-5회차에서 트로트 음악이 기분 전환에 효과적이었던 경험)",
+        "취미 활동을 통해 기분 전환을 해보신 적이 있나요? (3-5회차에서 가족 사진 정리, 화분 가꾸기 등 새로운 취미 개발)",
+        "이웃과 함께 마트에 가는 것이 어떠신가요? (4회차에서 사회적 교류 증진에 효과적이었던 지역사회 활동)",
+        "가족과의 정기적 연락 체계를 구축하는 것은 어떨까요? (2회차에서 확인된 연락 빈도 감소 문제의 구체적 해결책)",
+        "손자와 함께 공원에서 놀이를 하는 것은 어떠신가요? (3-4회차에서 자아존중감 향상에 기여했던 가족 활동)",
+        "매일 아침 산책 시간을 30분에서 40분으로 늘려보는 것은 어떨까요? (4-5회차에서 20분→30분으로 확대된 활동량 증가 경험)",
+        "이웃과의 대화에서 손자 이야기를 나누는 것이 어떠신가요? (3-4회차에서 사회적 교류 증진에 도움이 되었던 주제)",
+        "새로운 취미를 시작해보는 것은 어떨까요?",
+        "가족과 함께 요리하는 시간을 가져보는 것은 어떨까요?"
+      ],
       5: [
         "가족에게 긍정적인 감정을 표현해본다면 어떤 말을 하고 싶으세요?",
         "가족과 함께하고 싶은 활동이 있나요?",
@@ -942,18 +969,26 @@ const ClientManagement = memo(function ClientManagement({ onBack }: { onBack: ()
         "가족에게 도움을 받고 싶은 부분이 있나요?",
         "가족과 함께하고 싶은 여행이나 외출이 있나요?",
         "가족에게 감사한 마음을 표현하고 싶으신가요?",
-        "가족과의 관계에서 가장 중요하다고 생각하는 것은 무엇인가요?"
+        "가족과의 관계에서 가장 중요하다고 생각하는 것은 무엇인가요?",
+        "가족과 함께 새로운 경험을 해보고 싶으신가요?",
+        "가족에게 전하고 싶은 메시지가 있나요?",
+        "가족과 함께 미래 계획을 세워보는 것은 어떨까요?",
+        "가족과의 소통에서 가장 어려워하는 부분은 무엇인가요?"
       ]
     }
 
-    // 기본 질문들에서 랜덤하게 선택
+    // 기본 질문들에서 충분한 수의 질문을 준비
     const questions = baseQuestions[stepNumber as keyof typeof baseQuestions] || []
-    const shuffled = [...questions].sort(() => 0.5 - Math.random())
     
     // 회차별 맞춤형 질문 추가
     const customQuestions = generateCustomQuestions(stepNumber, client, records, emotionalScores)
     
-    return [...shuffled.slice(0, 4), ...customQuestions].slice(0, 4)
+    // 충분한 수의 질문을 반환 (체크된 질문과 중복되지 않도록)
+    const allQuestions = [...questions, ...customQuestions]
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
+    
+    // 최소 8개 이상의 질문을 반환하여 다양성 확보
+    return shuffled.slice(0, Math.max(8, allQuestions.length))
   }, []) // 의존성 배열 비움 - 함수 내부에서 외부 상태를 참조하지 않음
 
   // 회차별 맞춤형 질문 생성
