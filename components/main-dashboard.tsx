@@ -104,7 +104,7 @@ export function MainDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card>
             <CardContent className="p-3 sm:p-4 text-center">
               <Users className="h-6 w-6 sm:h-8 sm:w-8 text-primary mx-auto mb-2" />
@@ -136,7 +136,7 @@ export function MainDashboard() {
         </div>
 
         {/* Main Menu Buttons */}
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-3 lg:grid-cols-3">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader className="pb-3 sm:pb-4">
               <CardTitle className="flex items-center gap-3 text-base sm:text-lg">

@@ -76,7 +76,7 @@ const mockClients: Client[] = [
       phone: "010-9876-5432",
       relationship: "아들",
     },
-    lastVisit: "2024-01-10",
+    lastVisit: "2025-07-10",
     emotionalState: {
       current: "주의",
       trend: "악화",
